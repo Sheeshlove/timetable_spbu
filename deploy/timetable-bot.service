@@ -1,0 +1,37 @@
+[Unit]
+Description=SPbU timetable Telegram bot
+Documentation=https://github.com/sheeshlove/timetable_spbu
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=timetable
+Group=timetable
+WorkingDirectory=/opt/timetable_spbu
+EnvironmentFile=/opt/timetable_spbu/.env
+ExecStart=/opt/timetable_spbu/.venv/bin/python -m bot
+
+# aiogram сам ловит SIGTERM и корректно завершает polling
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+SyslogIdentifier=timetable-bot
+
+# Ограничение прав: боту нужен только каталог с базой и сеть
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6
+ReadWritePaths=/opt/timetable_spbu/data
+
+[Install]
+WantedBy=multi-user.target

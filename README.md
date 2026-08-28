@@ -64,22 +64,21 @@ python -m bot
 | `HTTP_TIMEOUT` | `20` | Таймаут запроса к сайту, секунды |
 | `LOG_LEVEL` | `INFO` | Уровень логирования |
 
-### Как демон systemd
+### На сервере
 
-```ini
-[Unit]
-Description=SPbU timetable telegram bot
-After=network-online.target
+Полная инструкция по развёртыванию — от чистой VPS до автозапуска, бэкапов и
+разбора неполадок — в [DEPLOY.md](DEPLOY.md). Коротко:
 
-[Service]
-WorkingDirectory=/opt/timetable_spbu
-ExecStart=/opt/timetable_spbu/.venv/bin/python -m bot
-EnvironmentFile=/opt/timetable_spbu/.env
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+```bash
+git clone https://github.com/sheeshlove/timetable_spbu.git /opt/timetable_spbu
+cd /opt/timetable_spbu
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp .env.example .env && nano .env          # вписать BOT_TOKEN
+cp deploy/timetable-bot.service /etc/systemd/system/
+systemctl enable --now timetable-bot
 ```
+
+Есть и вариант с Docker: `docker compose up -d --build`.
 
 ## Как устроено
 
@@ -102,6 +101,11 @@ bot/
     ├── api.py         разбор JSON-API сайта
     ├── scraper.py     резервный разбор HTML
     └── models.py      доменные модели
+
+deploy/
+├── timetable-bot.service   юнит systemd с ограничением прав
+├── backup.sh               онлайн-копия базы, не останавливая бота
+└── update.sh               обновление: бэкап, git pull, зависимости, рестарт
 ```
 
 Несколько решений, которые стоит знать при доработке:
