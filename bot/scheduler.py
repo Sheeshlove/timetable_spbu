@@ -18,6 +18,7 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from .config import Settings
 from .formatting import digest_header, format_note_reminder, format_schedule, split_message
 from .handlers.schedule import apply_cohorts
+from .i18n import Translator
 from .roster import Roster
 from .scheduling import next_run_at, period_for
 from .storage import Note, Storage, Subscription
@@ -89,10 +90,11 @@ class Scheduler:
     # --- Расписание ----------------------------------------------------
 
     async def _send_digest(self, subscription: Subscription, moment: datetime) -> int:
+        t = Translator(subscription.lang)
         start, end = period_for(subscription.frequency, moment, self.settings.tz)
         try:
             schedule = await self.client.schedule(
-                self.settings.group_id, start, end, self.settings.division_alias
+                self.settings.group_id, start, end, self.settings.division_alias, t.lang
             )
         except TimetableError as error:
             # Сайт молчит — не теряем слот, пробуем ещё раз через 15 минут.
@@ -105,9 +107,9 @@ class Scheduler:
 
         if not schedule.group_name:
             schedule.group_name = self.settings.program_title
-        schedule, footer = apply_cohorts(schedule, subscription, self.roster)
+        schedule, footer = apply_cohorts(schedule, subscription, self.roster, t)
         text = format_schedule(
-            schedule, digest_header(subscription.frequency, start, end), footer
+            schedule, t, digest_header(subscription.frequency, start, end, t), footer
         )
         status = await self._deliver(subscription.chat_id, text, user_id=subscription.user_id)
         if status == BLOCKED:
@@ -129,8 +131,12 @@ class Scheduler:
     # --- Заметки -------------------------------------------------------
 
     async def _send_note(self, note: Note) -> int:
+        subscription = await self.storage.get_subscription(note.user_id)
+        t = Translator(subscription.lang if subscription else "ru")
         status = await self._deliver(
-            note.chat_id, format_note_reminder(note, self.settings.tz), user_id=note.user_id
+            note.chat_id,
+            format_note_reminder(note, self.settings.tz, t),
+            user_id=note.user_id,
         )
         if status == OK:
             await self.storage.mark_note_sent(note.id)

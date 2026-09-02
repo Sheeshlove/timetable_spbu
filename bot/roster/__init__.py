@@ -27,10 +27,13 @@ class Subject:
 
     key: str
     column: str
-    title: str
+    titles: Mapping[str, str]
     kind: str  # cohort | group | educator
     match: tuple[str, ...]
     event_type: str | None = None  # lecture | seminar — для предметов вроде QMBR
+
+    def title(self, lang: str = "ru") -> str:
+        return self.titles.get(lang) or self.titles.get("ru") or self.column
 
 
 @dataclass(frozen=True)
@@ -74,7 +77,7 @@ class Roster:
             Subject(
                 key=item["key"],
                 column=item["column"],
-                title=item["title"],
+                titles=dict(item.get("titles", {})),
                 kind=item["kind"],
                 match=tuple(item.get("match", ())),
                 event_type=item.get("event_type"),
@@ -165,10 +168,10 @@ class Roster:
         scored.sort(key=lambda item: (-item[0], item[1].name))
         return [student for _score, student in scored[:MAX_SUGGESTIONS]]
 
-    def describe(self, student: Student) -> list[tuple[str, str]]:
+    def describe(self, student: Student, lang: str = "ru") -> list[tuple[str, str]]:
         """Пары «предмет — когорта» в порядке из таблицы."""
         return [
-            (subject.title, student.cohorts.get(subject.key, ""))
+            (subject.title(lang), student.cohorts.get(subject.key, ""))
             for subject in self.subjects
             if student.cohorts.get(subject.key)
         ]

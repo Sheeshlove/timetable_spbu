@@ -5,84 +5,109 @@
   {
    "key": "corp_finance",
    "column": "Corp. Finance",
-   "title": "Corporate Finance",
+   "titles": {
+    "ru": "Корпоративные финансы",
+    "en": "Corporate Finance"
+   },
    "kind": "cohort",
    "match": [
+    "корпоративные финансы",
+    "корпоративным финансам",
     "corporate finance",
-    "corp. finance",
-    "corp finance",
-    "корпоративные финансы"
+    "corp. finance"
    ]
   },
   {
    "key": "org_behaviour",
    "column": "Org. Behaviour",
-   "title": "Organizational Behaviour",
+   "titles": {
+    "ru": "Организационное поведение",
+    "en": "Organizational Behaviour"
+   },
    "kind": "cohort",
    "match": [
+    "организационное поведение",
+    "организационного поведения",
     "organizational behaviour",
-    "organizational behavior",
-    "org. behaviour",
-    "org behaviour",
-    "организационное поведение"
+    "organizational behavior"
    ]
   },
   {
    "key": "qmbr_lectures",
    "column": "QMBR lectures",
-   "title": "QMBR, лекции",
+   "titles": {
+    "ru": "Количественные методы, лекции",
+    "en": "QMBR, lectures"
+   },
    "kind": "cohort",
    "match": [
-    "qmbr",
+    "количественные методы исследований",
+    "количественных методов исследований",
     "quantitative methods",
-    "количественные методы"
+    "qmbr"
    ],
    "event_type": "lecture"
   },
   {
    "key": "qmbr_seminars",
    "column": "QMBR seminars",
-   "title": "QMBR, семинары",
+   "titles": {
+    "ru": "Количественные методы, семинары",
+    "en": "QMBR, seminars"
+   },
    "kind": "cohort",
    "match": [
-    "qmbr",
+    "количественные методы исследований",
+    "количественных методов исследований",
     "quantitative methods",
-    "количественные методы"
+    "qmbr"
    ],
    "event_type": "seminar"
   },
   {
    "key": "rs_1",
    "column": "RS I",
-   "title": "Research Seminar I",
+   "titles": {
+    "ru": "Исследовательский семинар I",
+    "en": "Research Seminar I"
+   },
    "kind": "group",
    "match": [
-    "research seminar",
-    "rs i",
-    "исследовательский семинар"
+    "исследовательский семинар",
+    "исследовательского семинара",
+    "research seminar"
    ]
   },
   {
    "key": "ccm",
    "column": "CCM",
-   "title": "Cross-Cultural Management",
+   "titles": {
+    "ru": "Кросс-культурный менеджмент",
+    "en": "Cross-Cultural Management"
+   },
    "kind": "group",
    "match": [
+    "кросс-культурный менеджмент",
+    "кросскультурный менеджмент",
+    "межкультурный менеджмент",
     "cross-cultural management",
-    "cross cultural management",
-    "ccm",
-    "кросс-культурный менеджмент"
+    "cross cultural management"
    ]
   },
   {
    "key": "mps_1",
    "column": "MPS I",
-   "title": "MPS I",
+   "titles": {
+    "ru": "Профессиональные навыки менеджера I",
+    "en": "Managerial and Professional Skills I"
+   },
    "kind": "educator",
    "match": [
-    "mps",
-    "managerial problem solving",
-    "управленческ"
+    "профессиональные навыки менеджера",
+    "профессиональных навыков менеджера",
+    "managerial and professional skills",
+    "professional skills",
+    "mps i"
    ]
   }
  ],

@@ -15,11 +15,11 @@ from ..timetable.models import Day, Event, Schedule
 from . import Roster, Student, Subject
 from .translit import is_cyrillic, to_latin
 
-# «Coh.1», «Cohort 2», «когорта 3», «ког. 1»
+# На сайте деление потока подписано как «Подгруппа 2» / «Subgroup 2»;
+# ведомость деканата пользуется обозначениями «Coh.1» и просто номерами.
 COHORT_RE = re.compile(r"(?:coh\.?|cohort|когорт\w*|ког\.?)\s*[-–—:]?\s*(\d+)", re.I)
-# «группа 1», «гр. 2», «поток 3», «group 1», «подгруппа 2»
 GROUP_RE = re.compile(
-    r"(?:подгруп\w*|груп\w*|гр\.|поток\w*|subgroup|group|gr\.)\s*[-–—:]?\s*(\d+)", re.I
+    r"(?:подгруп\w*|груп\w*|гр\.|поток\w*|sub-?group|group|gr\.)\s*[-–—:]?\s*(\d+)", re.I
 )
 # «1 когорта», «2 группа» — тот же смысл, обратный порядок слов
 REVERSED_RE = re.compile(r"(\d+)\s*(?:когорт\w*|груп\w*|поток\w*|cohort|group)", re.I)
@@ -36,8 +36,13 @@ class FilterReport:
     reasons: list[str] = field(default_factory=list)
 
 
-def event_text(event: Event) -> str:
-    return " ".join(part for part in (event.subject, event.educators, event.locations) if part)
+def marker_text(event: Event) -> str:
+    """Текст, в котором ищем номер подгруппы.
+
+    Адрес и преподаватель сюда не входят: номер аудитории «А,105» не должен
+    сойти за номер подгруппы.
+    """
+    return " ".join(part for part in (event.subject, event.subgroup) if part)
 
 
 def _numbers(text: str) -> set[int]:
@@ -98,25 +103,25 @@ def matching_subjects(text: str, roster: Roster) -> list[Subject]:
 
 def belongs_to(event: Event, student: Student, roster: Roster) -> tuple[bool, str]:
     """Показывать ли занятие. Второе значение — причина, если скрываем."""
-    text = event_text(event)
-    subjects = matching_subjects(text, roster)
+    subjects = matching_subjects(event.subject, roster)
     if not subjects:
         return True, ""
 
+    text = marker_text(event)
     for subject in subjects:
         mine = student.cohorts.get(subject.key, "")
         if not mine:
             continue
 
         if subject.kind == "educator":
-            verdict = _check_educator(text, mine, subject, roster)
+            verdict = _check_educator(text, event.educators, mine, subject, roster)
         else:
             verdict = _check_number(text, mine, subject, roster)
 
         if verdict is True:  # занятие точно моё — дальше не смотрим
             return True, ""
         if verdict is False:
-            return False, f"{subject.title}: не моя когорта ({mine})"
+            return False, f"{subject.title()}: не моя когорта ({mine})"
 
     # Ни один предмет не дал уверенного ответа — показываем.
     return True, ""
@@ -140,16 +145,18 @@ def _check_number(text: str, mine: str, subject: Subject, roster: Roster) -> boo
     return False if mentioned & known else None
 
 
-def _check_educator(text: str, mine: str, subject: Subject, roster: Roster) -> bool | None:
+def _check_educator(
+    text: str, educators: str, mine: str, subject: Subject, roster: Roster
+) -> bool | None:
     my_surname = _surname(mine)
     my_number = _value_number(mine)
-    if not _mentions_surname(text, my_surname):
+    if not _mentions_surname(educators, my_surname):
         others = {
             _surname(value)
             for value in _subject_values(subject, roster)
             if _surname(value) and _surname(value) != my_surname
         }
-        if any(_mentions_surname(text, surname) for surname in others):
+        if any(_mentions_surname(educators, surname) for surname in others):
             return False
         return None
 

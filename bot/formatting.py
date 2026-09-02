@@ -5,41 +5,47 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from html import escape
 
+from .i18n import Translator
 from .roster import Roster, Student
-from .scheduling import DAILY, FREQUENCY_TITLES, MONTHLY, WEEKLY
+from .scheduling import DAILY, MONTHLY, OFF, WEEKLY
 from .storage import Note, Subscription
 from .timetable.models import Day, Schedule
 
-WEEKDAYS = (
-    "понедельник", "вторник", "среда", "четверг",
-    "пятница", "суббота", "воскресенье",
-)
-MONTHS_GENITIVE = (
-    "января", "февраля", "марта", "апреля", "мая", "июня",
-    "июля", "августа", "сентября", "октября", "ноября", "декабря",
-)
-MONTHS_NOMINATIVE = (
-    "январь", "февраль", "март", "апрель", "май", "июнь",
-    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
-)
 TELEGRAM_LIMIT = 4096
 
+FREQUENCY_KEYS = {
+    DAILY: "freq_daily",
+    WEEKLY: "freq_weekly",
+    MONTHLY: "freq_monthly",
+    OFF: "freq_off",
+}
 
-def human_date(day: date) -> str:
-    return f"{day.day} {MONTHS_GENITIVE[day.month - 1]}, {WEEKDAYS[day.weekday()]}"
+
+def frequency_title(frequency: str, t: Translator) -> str:
+    return t(FREQUENCY_KEYS.get(frequency, "freq_off"))
 
 
-def format_day(day: Day) -> str:
+def human_date(day: date, t: Translator) -> str:
+    month = t.months_in_date[day.month - 1]
+    weekday = t.weekdays[day.weekday()]
+    if t.lang == "en":
+        return f"{month} {day.day}, {weekday}"
+    return f"{day.day} {month}, {weekday}"
+
+
+def format_day(day: Day, t: Translator) -> str:
     """Один день расписания."""
-    title = human_date(day.date) if day.date else (day.title or "Без даты")
+    title = human_date(day.date, t) if day.date else (day.title or "")
     lines = [f"<b>{escape(title)}</b>"]
     if not day.events:
-        lines.append("  — занятий нет")
+        lines.append(t("no_classes_day"))
         return "\n".join(lines)
     for event in day.events:
         subject = escape(event.subject)
+        if event.subgroup:
+            subject += f" · {escape(event.subgroup)}"
         if event.is_canceled:
-            subject = f"<s>{subject}</s> ❌ отменено"
+            subject = f"<s>{subject}</s> ❌ {t('canceled')}"
         interval = escape(event.interval)
         lines.append(f"  🕘 <b>{interval}</b> {subject}" if interval else f"  🕘 {subject}")
         if event.educators:
@@ -49,24 +55,27 @@ def format_day(day: Day) -> str:
     return "\n".join(lines)
 
 
-def format_schedule(schedule: Schedule, header: str = "", footer: str = "") -> str:
+def format_schedule(
+    schedule: Schedule, t: Translator, header: str = "", footer: str = ""
+) -> str:
     """Расписание целиком. Дни без занятий не печатаются, если их много."""
     parts: list[str] = []
     if header:
         parts.append(f"<b>{escape(header)}</b>")
     if schedule.group_name:
-        parts.append(f"👥 {escape(schedule.group_name)}")
+        parts.append(t("group_label", name=escape(schedule.group_name)))
 
     days_with_events = [day for day in schedule.days if day.events]
     days = schedule.days if len(schedule.days) <= 7 else days_with_events
     if not days_with_events:
-        parts.append("\nЗанятий на этот период нет 🎉")
+        parts.append("\n" + t("no_classes"))
     else:
-        parts.extend("\n" + format_day(day) for day in days)
+        parts.extend("\n" + format_day(day, t) for day in days)
     if footer:
         parts.append(f"\n<i>{escape(footer)}</i>")
     if schedule.url:
-        parts.append(f'\n<a href="{escape(schedule.url, quote=True)}">Открыть на сайте</a>')
+        link = escape(schedule.url, quote=True)
+        parts.append(f'\n<a href="{link}">{t("open_on_site")}</a>')
     return "\n".join(parts)
 
 
@@ -93,74 +102,80 @@ def split_message(text: str, limit: int = TELEGRAM_LIMIT) -> list[str]:
     return chunks
 
 
-def format_cohorts(student: Student, roster: Roster) -> str:
+def format_cohorts(student: Student, roster: Roster, t: Translator) -> str:
     """Список «предмет — когорта» для конкретного студента."""
-    pairs = roster.describe(student)
+    pairs = roster.describe(student, t.lang)
     if not pairs:
-        return "Когорты для вас в списке не указаны."
-    lines = ["<b>Ваши когорты</b>"]
+        return t("cohorts_empty")
+    lines = [t("cohorts_title")]
     lines.extend(f"  · {escape(title)} — <b>{escape(value)}</b>" for title, value in pairs)
     return "\n".join(lines)
 
 
-def format_subscription(subscription: Subscription, settings, roster: Roster) -> str:
+def format_subscription(
+    subscription: Subscription, settings, roster: Roster, t: Translator
+) -> str:
     """Карточка текущих настроек."""
-    lines = ["<b>Ваши настройки</b>", f"🎓 Программа: {escape(settings.program_title)}"]
+    lines = [
+        t("settings_title"),
+        t("settings_program", program=escape(settings.program_title)),
+        t("settings_language", language=t.language_name),
+    ]
 
     student = roster.get(subscription.student_name) if subscription.student_name else None
     if student:
-        lines.append(f"👤 Вы: {escape(student.name)}")
+        lines.append(t("settings_student", name=escape(student.name)))
     elif subscription.student_name:
         lines.append(
-            f"👤 Вы: {escape(subscription.student_name)} "
-            "(в текущем списке не найдены — обновите фамилию)"
+            t("settings_student_missing", name=escape(subscription.student_name))
         )
     else:
-        lines.append("👤 Фамилия не указана — показываю расписание всей программы")
+        lines.append(t("settings_no_student"))
 
     if student:
         lines.append(
-            "🔎 Показываю: "
-            + ("всё расписание" if subscription.show_all else "только занятия моих когорт")
+            t("settings_filter_all") if subscription.show_all else t("settings_filter_mine")
         )
     lines.append(
-        f"🔔 Рассылка: {FREQUENCY_TITLES.get(subscription.frequency, subscription.frequency)}"
+        t("settings_frequency", frequency=frequency_title(subscription.frequency, t))
     )
-    if subscription.frequency != "off":
-        lines.append(f"⏰ Время: {subscription.send_time}")
+    if subscription.frequency != OFF:
+        lines.append(t("settings_time", time=subscription.send_time))
         if subscription.next_run_at:
             local = subscription.next_run_at.astimezone(settings.tz)
-            lines.append(f"➡️ Следующая отправка: {local:%d.%m.%Y %H:%M}")
+            lines.append(t("settings_next_run", moment=f"{local:%d.%m.%Y %H:%M}"))
 
     if student and not subscription.show_all:
-        lines.append("\n" + format_cohorts(student, roster))
+        lines.append("\n" + format_cohorts(student, roster, t))
     return "\n".join(lines)
 
 
-def format_notes(notes: list[Note], tz) -> str:
+def format_notes(notes: list[Note], tz, t: Translator) -> str:
     if not notes:
-        return "У вас нет запланированных заметок."
-    lines = ["<b>Запланированные заметки</b>"]
+        return t("notes_empty")
+    lines = [t("notes_title")]
     for note in notes:
         when = note.due_at.astimezone(tz)
         lines.append(f"\n#{note.id} — {when:%d.%m.%Y %H:%M}\n{escape(note.text)}")
-    lines.append("\nУдалить: /delnote &lt;номер&gt;")
+    lines.append("\n" + t("notes_delete_hint"))
     return "\n".join(lines)
 
 
-def digest_header(frequency: str, start: date, end: date) -> str:
+def digest_header(frequency: str, start: date, end: date, t: Translator) -> str:
     if frequency == DAILY:
-        return f"Расписание на {human_date(start)}"
+        return t("header_day", date=human_date(start, t))
     if frequency == WEEKLY:
-        return f"Расписание на неделю {start:%d.%m} — {end:%d.%m}"
+        return t("header_week", start=f"{start:%d.%m}", end=f"{end:%d.%m}")
     if frequency == MONTHLY:
-        return f"Расписание на {MONTHS_NOMINATIVE[start.month - 1]} {start.year}"
-    return f"Расписание {start:%d.%m} — {end:%d.%m}"
+        return t(
+            "header_month", month=t.months_standalone[start.month - 1], year=start.year
+        )
+    return t("header_range", start=f"{start:%d.%m}", end=f"{end:%d.%m}")
 
 
-def format_note_reminder(note: Note, tz) -> str:
+def format_note_reminder(note: Note, tz, t: Translator) -> str:
     when = note.due_at.astimezone(tz)
-    return f"📝 <b>Ваша заметка на {when:%d.%m.%Y}</b>\n\n{escape(note.text)}"
+    return f"{t('note_reminder', date=f'{when:%d.%m.%Y}')}\n\n{escape(note.text)}"
 
 
 def now_local(tz) -> datetime:

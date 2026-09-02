@@ -1,9 +1,11 @@
-"""Резервный разбор HTML-страниц timetable.spbu.ru.
+"""Разбор HTML-страницы расписания timetable.spbu.ru.
 
-Используется, когда JSON-API недоступен или изменился. Парсер намеренно
-терпим к разметке: он опирается на структуру классов вида `day`,
-`study-event` и на текстовые заголовки, а не на конкретную вёрстку
-бутстрапа, которая на сайте меняется чаще всего.
+Используется, когда JSON-API недоступен или отдал пустоту. Разметка взята с
+живой страницы недели: день — панель `panel panel-default` с заголовком
+`panel-title`, занятие — `li.common-list-item`, а внутри него колонки
+`studyevent-datetime`, `studyevent-subject`, `studyevent-locations`,
+`studyevent-educators`. Деление потока подписано отдельным блоком с иконкой
+`glyphicon-transfer` («Подгруппа 2»).
 """
 
 from __future__ import annotations
@@ -15,14 +17,20 @@ from bs4 import BeautifulSoup, Tag
 
 from .models import Day, Event, Schedule
 
-DATE_RE = re.compile(r"(\d{1,2})\s+([А-Яа-яЁё]+)\s*(\d{4})?")
-TIME_RE = re.compile(r"\d{1,2}[:.]\d{2}\s*[–—-]\s*\d{1,2}[:.]\d{2}")
-DAY_CLASS_RE = re.compile(r"^days?(-(container|panel|wrapper|block))?$", re.I)
+TIME_RE = re.compile(r"(\d{1,2}[:.]\d{2})\s*[–—-]\s*(\d{1,2}[:.]\d{2})")
+DAY_DATE_RU = re.compile(r"(\d{1,2})\s+([А-Яа-яЁё]+)\s*(\d{4})?")
+DAY_DATE_EN = re.compile(r"([A-Za-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?")
 
-MONTHS = {
+MONTHS_RU = {
     "янва": 1, "февра": 2, "март": 3, "апре": 4, "мая": 5, "май": 5, "июн": 6,
     "июл": 7, "август": 8, "сентяб": 9, "октяб": 10, "нояб": 11, "декаб": 12,
 }
+MONTHS_EN = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+CANCELED_RE = re.compile(r"отмен|cancel", re.I)
 
 
 def _soup(html: str) -> BeautifulSoup:
@@ -36,104 +44,94 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
-def _outermost(nodes: list[Tag]) -> list[Tag]:
-    """Оставляет только внешние узлы: `study-event-time` лежит внутри
-    `study-event` и тоже попадает под регулярное выражение, но отдельным
-    занятием не является."""
-    result: list[Tag] = []
-    for node in nodes:
-        if any(parent is other for other in nodes for parent in node.parents):
-            continue
-        result.append(node)
-    return result
+def parse_day_date(text: str, fallback_year: int | None = None) -> date | None:
+    """«понедельник, 14 сентября» или «Monday, September 14» -> дата."""
+    year = fallback_year or datetime.now().year
 
+    match = DAY_DATE_RU.search(text or "")
+    if match:
+        day, word = int(match.group(1)), match.group(2).lower()
+        if match.group(3):
+            year = int(match.group(3))
+        for prefix, number in MONTHS_RU.items():
+            if word.startswith(prefix):
+                return _safe_date(year, number, day)
 
-def _parse_day_date(text: str, fallback_year: int | None = None) -> date | None:
-    match = DATE_RE.search(text or "")
-    if not match:
-        return None
-    day = int(match.group(1))
-    month_word = match.group(2).lower()
-    year = int(match.group(3)) if match.group(3) else (fallback_year or datetime.now().year)
-    for prefix, number in MONTHS.items():
-        if month_word.startswith(prefix):
-            try:
-                return date(year, number, day)
-            except ValueError:
-                return None
+    match = DAY_DATE_EN.search(text or "")
+    if match:
+        word, day = match.group(1).lower(), int(match.group(2))
+        if match.group(3):
+            year = int(match.group(3))
+        number = MONTHS_EN.get(word[:3])
+        if number:
+            return _safe_date(year, number, day)
     return None
 
 
+def _safe_date(year: int, month: int, day: int) -> date | None:
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
 def parse_schedule_html(html: str, group_id: int, fallback_year: int | None = None) -> Schedule:
-    """Расписание недели со страницы StudentGroupEvents/Primary."""
     soup = _soup(html)
-    group_name = ""
-    header = soup.find(["h1", "h2"])
-    if header:
-        group_name = _clean(header.get_text())
+
+    header = soup.find("h2")
+    group_name = _clean(header.get_text()) if header else ""
 
     days: list[Day] = []
-    day_nodes = _outermost(
-        [
-            node
-            for node in soup.find_all(True)
-            if any(DAY_CLASS_RE.match(name) for name in (node.get("class") or []))
+    for panel in soup.select("div.panel"):
+        title_node = panel.select_one(".panel-title, .panel-heading")
+        if title_node is None:
+            continue
+        title = _clean(title_node.get_text())
+        events = [
+            event
+            for item in panel.select("li.common-list-item")
+            if (event := _parse_event(item)) is not None
         ]
-    )
-    for node in day_nodes:
-        title_node = node.find(
-            attrs={"class": re.compile(r"(day-?header|panel-heading|title)", re.I)}
-        )
-        title = _clean(title_node.get_text()) if title_node else ""
-        if not title:
-            title = _clean(node.get_text())[:60]
-        day_date = _parse_day_date(title, fallback_year)
-        events = _parse_events(node)
-        if not events and not day_date:
+        day_date = parse_day_date(title, fallback_year)
+        if not events and day_date is None:
             continue
         days.append(Day(date=day_date, title=title, events=events))
-
-    if not days:  # разметка без обёрток дней — собираем плоский список
-        events = _parse_events(soup)
-        if events:
-            days.append(Day(date=None, title="", events=events))
 
     return Schedule(group_id=group_id, group_name=group_name, days=days)
 
 
-def _parse_events(container: Tag) -> list[Event]:
-    events: list[Event] = []
-    nodes = _outermost(
-        container.find_all(
-            attrs={"class": re.compile(r"(study-?event|event-?container|lesson)", re.I)}
-        )
+def _parse_event(item: Tag) -> Event | None:
+    subject_block = item.select_one(".studyevent-subject")
+    if subject_block is None:
+        return None
+
+    blocks = subject_block.select(".with-icon")
+    subject = _clean(blocks[0].get_text()) if blocks else _clean(subject_block.get_text())
+    if not subject:
+        return None
+
+    # Второй блок с иконкой — деление потока: «Подгруппа 2», «Subgroup 2».
+    subgroup = " ".join(_clean(block.get_text()) for block in blocks[1:]).strip()
+
+    time_block = item.select_one(".studyevent-datetime")
+    time_text = _clean(time_block.get_text()) if time_block else ""
+    match = TIME_RE.search(time_text)
+    time_text = f"{match.group(1)}–{match.group(2)}".replace(".", ":") if match else time_text
+
+    location_block = item.select_one(".studyevent-locations")
+    locations = ""
+    if location_block is not None:
+        address = location_block.select_one(".address-modal-btn")
+        locations = _clean((address or location_block).get_text())
+
+    educator_block = item.select_one(".studyevent-educators")
+    educators = _clean(educator_block.get_text()) if educator_block else ""
+
+    return Event(
+        subject=subject[:300],
+        time_text=time_text,
+        locations=locations,
+        educators=educators,
+        subgroup=subgroup,
+        is_canceled=bool(CANCELED_RE.search(_clean(item.get_text()))),
     )
-    for node in nodes:
-        text = _clean(node.get_text(" "))
-        if not text:
-            continue
-        time_node = node.find(attrs={"class": re.compile(r"(time|interval)", re.I)})
-        time_text = _clean(time_node.get_text()) if time_node else ""
-        if not time_text:
-            time_match = TIME_RE.search(text)
-            time_text = time_match.group(0) if time_match else ""
-        subject_node = node.find(attrs={"class": re.compile(r"(subject|title|name)", re.I)})
-        subject = _clean(subject_node.get_text()) if subject_node else ""
-        if not subject:
-            subject = _clean(text.replace(time_text, " ") if time_text else text) or text
-        location_node = node.find(
-            attrs={"class": re.compile(r"(location|address|room|place)", re.I)}
-        )
-        educator_node = node.find(
-            attrs={"class": re.compile(r"(educator|teacher|lecturer)", re.I)}
-        )
-        events.append(
-            Event(
-                subject=subject[:300],
-                time_text=time_text.replace(".", ":"),
-                locations=_clean(location_node.get_text()) if location_node else "",
-                educators=_clean(educator_node.get_text()) if educator_node else "",
-                is_canceled="отмен" in text.lower(),
-            )
-        )
-    return events

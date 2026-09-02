@@ -14,20 +14,14 @@ from aiogram.types import CallbackQuery, Message
 from ..config import Settings
 from ..dates import DateParseError, parse_due, split_due
 from ..formatting import format_notes
-from ..keyboards import BTN_NOTES, note_day_keyboard, notes_menu_keyboard
+from ..i18n import Translator
+from ..keyboards import note_day_keyboard, notes_menu_keyboard
 from ..storage import Storage
 
 logger = logging.getLogger(__name__)
 router = Router(name="notes")
 
 MAX_NOTE_LENGTH = 3000
-
-ASK_TEXT = "Напишите текст заметки — я пришлю его в выбранный день."
-ASK_DAY = "Когда напомнить?"
-ASK_CUSTOM_DAY = (
-    "Напишите день: <code>05.09</code>, <code>05.09.2026 18:30</code>, "
-    "<code>5 сентября</code>, <code>через 3 дня</code> или <code>в пятницу</code>."
-)
 
 
 class NoteStates(StatesGroup):
@@ -49,6 +43,7 @@ async def _save_note(
     state: FSMContext,
     storage: Storage,
     settings: Settings,
+    t: Translator,
     user_id: int,
     text: str,
     due_at: datetime,
@@ -57,8 +52,12 @@ async def _save_note(
     local = due_at.astimezone(settings.tz)
     await state.clear()
     await message.answer(
-        f"Записал ✅\nПришлю {local:%d.%m.%Y} в {local:%H:%M}.\n"
-        f"Список заметок: /notes, удалить: /delnote {note_id}"
+        t(
+            "note_saved",
+            date=f"{local:%d.%m.%Y}",
+            time=f"{local:%H:%M}",
+            id=note_id,
+        )
     )
 
 
@@ -69,12 +68,13 @@ async def cmd_note(
     state: FSMContext,
     storage: Storage,
     settings: Settings,
+    t: Translator,
 ) -> None:
     """/note — диалог; /note 05.09 текст — быстрая запись одной строкой."""
     argument = (command.args or "").strip()
     if not argument:
         await state.set_state(NoteStates.text)
-        await message.answer(ASK_TEXT)
+        await message.answer(t("note_ask_text"))
         return
 
     try:
@@ -85,98 +85,108 @@ async def cmd_note(
         # Даты нет — считаем всю строку текстом и спрашиваем день кнопками.
         await state.update_data(note_text=argument[:MAX_NOTE_LENGTH])
         await state.set_state(NoteStates.day)
-        await message.answer(ASK_DAY, reply_markup=note_day_keyboard())
+        await message.answer(t("note_ask_day"), reply_markup=note_day_keyboard(t))
         return
 
     if not text:
         await state.update_data(note_due_at=due_at.isoformat())
         await state.set_state(NoteStates.text)
-        await message.answer(ASK_TEXT)
+        await message.answer(t("note_ask_text"))
         return
 
     await _save_note(
-        message, state, storage, settings, message.from_user.id, text[:MAX_NOTE_LENGTH], due_at
+        message, state, storage, settings, t, message.from_user.id,
+        text[:MAX_NOTE_LENGTH], due_at,
     )
 
 
 @router.message(Command("notes"))
-async def cmd_notes(message: Message, storage: Storage, settings: Settings) -> None:
+async def cmd_notes(
+    message: Message, storage: Storage, settings: Settings, t: Translator
+) -> None:
     notes = await storage.pending_notes(message.from_user.id)
-    await message.answer(format_notes(notes, settings.tz), reply_markup=notes_menu_keyboard())
+    await message.answer(
+        format_notes(notes, settings.tz, t), reply_markup=notes_menu_keyboard(t)
+    )
 
 
-@router.message(F.text == BTN_NOTES)
-async def on_notes_button(message: Message, storage: Storage, settings: Settings) -> None:
-    await cmd_notes(message, storage, settings)
+@router.message(F.text.in_({"📝 Заметки", "📝 Notes"}))
+async def on_notes_button(
+    message: Message, storage: Storage, settings: Settings, t: Translator
+) -> None:
+    await cmd_notes(message, storage, settings, t)
 
 
 @router.message(Command("delnote"))
 async def cmd_delete_note(
-    message: Message, command: CommandObject, storage: Storage
+    message: Message, command: CommandObject, storage: Storage, t: Translator
 ) -> None:
     raw = (command.args or "").strip().lstrip("#")
     if not raw.isdigit():
-        await message.answer("Укажите номер заметки: /delnote 12 (номера — в /notes)")
+        await message.answer(t("note_need_number"))
         return
     deleted = await storage.delete_note(message.from_user.id, int(raw))
-    await message.answer("Удалил 🗑" if deleted else "Заметка не найдена.")
+    await message.answer(t("note_deleted") if deleted else t("note_not_found"))
 
 
 @router.callback_query(F.data == "note:new")
-async def on_new_note(callback: CallbackQuery, state: FSMContext) -> None:
+async def on_new_note(callback: CallbackQuery, state: FSMContext, t: Translator) -> None:
     await callback.answer()
     await state.set_state(NoteStates.text)
-    await callback.message.answer(ASK_TEXT)
+    await callback.message.answer(t("note_ask_text"))
 
 
 @router.callback_query(F.data == "note:list")
 async def on_list_notes(
-    callback: CallbackQuery, storage: Storage, settings: Settings
+    callback: CallbackQuery, storage: Storage, settings: Settings, t: Translator
 ) -> None:
     await callback.answer()
     notes = await storage.pending_notes(callback.from_user.id)
-    await callback.message.answer(format_notes(notes, settings.tz))
+    await callback.message.answer(format_notes(notes, settings.tz, t))
 
 
 @router.message(NoteStates.text, F.text)
 async def on_note_text(
-    message: Message, state: FSMContext, storage: Storage, settings: Settings
+    message: Message,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    t: Translator,
 ) -> None:
     data = await state.get_data()
     known_due = data.get("note_due_at")
     if known_due:  # день уже назван в /note, осталось получить текст
         await _save_note(
-            message,
-            state,
-            storage,
-            settings,
-            message.from_user.id,
-            message.text[:MAX_NOTE_LENGTH],
-            datetime.fromisoformat(known_due),
+            message, state, storage, settings, t, message.from_user.id,
+            message.text[:MAX_NOTE_LENGTH], datetime.fromisoformat(known_due),
         )
         return
     await state.update_data(note_text=message.text[:MAX_NOTE_LENGTH])
     await state.set_state(NoteStates.day)
-    await message.answer(ASK_DAY, reply_markup=note_day_keyboard())
+    await message.answer(t("note_ask_day"), reply_markup=note_day_keyboard(t))
 
 
 @router.callback_query(F.data.startswith("noteday:"))
 async def on_note_day(
-    callback: CallbackQuery, state: FSMContext, storage: Storage, settings: Settings
+    callback: CallbackQuery,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    t: Translator,
 ) -> None:
     choice = callback.data.split(":", 1)[1]
     data = await state.get_data()
     text = data.get("note_text")
     if not text:
-        await callback.answer("Текст заметки потерялся")
+        await callback.answer(t("note_lost"))
         await state.set_state(NoteStates.text)
-        await callback.message.answer(ASK_TEXT)
+        await callback.message.answer(t("note_ask_text"))
         return
 
     await callback.answer()
     if choice == "custom":
         await state.set_state(NoteStates.custom_day)
-        await callback.message.answer(ASK_CUSTOM_DAY)
+        await callback.message.answer(t("note_ask_custom_day"))
         return
 
     at_time = await _default_time(storage, callback.from_user.id)
@@ -186,19 +196,18 @@ async def on_note_day(
     if due_at <= now_local:
         due_at = now_local + timedelta(minutes=1)
     await _save_note(
-        callback.message,
-        state,
-        storage,
-        settings,
-        callback.from_user.id,
-        text,
-        due_at.astimezone(timezone.utc),
+        callback.message, state, storage, settings, t, callback.from_user.id,
+        text, due_at.astimezone(timezone.utc),
     )
 
 
 @router.message(NoteStates.custom_day, F.text)
 async def on_custom_day(
-    message: Message, state: FSMContext, storage: Storage, settings: Settings
+    message: Message,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    t: Translator,
 ) -> None:
     data = await state.get_data()
     text = data.get("note_text", "")
@@ -209,14 +218,20 @@ async def on_custom_day(
             default_time=await _default_time(storage, message.from_user.id),
         )
     except DateParseError:
-        await message.answer("Не понял дату 🤔 " + ASK_CUSTOM_DAY)
+        await message.answer(t("note_bad_date") + t("note_ask_custom_day"))
         return
-    await _save_note(message, state, storage, settings, message.from_user.id, text, due_at)
+    await _save_note(
+        message, state, storage, settings, t, message.from_user.id, text, due_at
+    )
 
 
 @router.message(NoteStates.day, F.text)
 async def on_day_typed_instead_of_button(
-    message: Message, state: FSMContext, storage: Storage, settings: Settings
+    message: Message,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    t: Translator,
 ) -> None:
     """На шаге выбора дня можно не жать кнопку, а написать дату словами."""
     data = await state.get_data()
@@ -228,19 +243,23 @@ async def on_day_typed_instead_of_button(
             default_time=await _default_time(storage, message.from_user.id),
         )
     except DateParseError:
-        await message.answer("Не понял дату 🤔 " + ASK_CUSTOM_DAY, reply_markup=note_day_keyboard())
+        await message.answer(
+            t("note_bad_date") + t("note_ask_custom_day"),
+            reply_markup=note_day_keyboard(t),
+        )
         return
-    await _save_note(message, state, storage, settings, message.from_user.id, text, due_at)
+    await _save_note(
+        message, state, storage, settings, t, message.from_user.id, text, due_at
+    )
 
 
 @router.message(F.text & ~F.text.startswith("/"))
-async def on_free_text(message: Message, state: FSMContext) -> None:
+async def on_free_text(
+    message: Message, state: FSMContext, t: Translator
+) -> None:
     """Любой свободный текст вне диалогов считаем черновиком заметки."""
     if await state.get_state() is not None:
         return
     await state.update_data(note_text=message.text[:MAX_NOTE_LENGTH])
     await state.set_state(NoteStates.day)
-    await message.answer(
-        "Сохранить это как заметку? Выберите день, когда её прислать.",
-        reply_markup=note_day_keyboard(),
-    )
+    await message.answer(t("note_draft"), reply_markup=note_day_keyboard(t))

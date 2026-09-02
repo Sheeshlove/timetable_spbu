@@ -13,6 +13,7 @@ from aiogram.types import BotCommand
 
 from .config import Settings, load_settings
 from .handlers import notes, schedule, setup
+from .middleware import LanguageMiddleware
 from .roster import Roster, load_roster
 from .scheduler import Scheduler
 from .storage import Storage
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 COMMANDS = [
     BotCommand(command="start", description="Начать и указать фамилию"),
+    BotCommand(command="language", description="Язык / Language"),
     BotCommand(command="today", description="Расписание на сегодня"),
     BotCommand(command="tomorrow", description="Расписание на завтра"),
     BotCommand(command="week", description="Расписание на эту неделю"),
@@ -44,6 +46,9 @@ def build_dispatcher(
     dispatcher["client"] = client
     dispatcher["settings"] = settings
     dispatcher["roster"] = roster
+    # Язык пользователя подставляется до хендлеров — им нужен готовый `t`.
+    dispatcher.message.middleware(LanguageMiddleware())
+    dispatcher.callback_query.middleware(LanguageMiddleware())
     # Порядок важен: мастер настройки и команды идут раньше, чем перехват
     # свободного текста в заметках.
     dispatcher.include_router(setup.router)

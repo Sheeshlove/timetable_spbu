@@ -17,6 +17,8 @@ class Event:
     locations: str = ""
     educators: str = ""
     is_canceled: bool = False
+    # «Подгруппа 2» / «Subgroup 2» — по этой пометке сайт делит поток
+    subgroup: str = ""
 
     @property
     def interval(self) -> str:

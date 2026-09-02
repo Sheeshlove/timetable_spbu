@@ -133,3 +133,63 @@ def test_every_student_keeps_own_lesson():
         cohort = student.cohorts["corp_finance"].replace("Coh.", "")
         event = Event(subject=f"Corporate Finance (Coh.{cohort})")
         assert belongs_to(event, student, roster)[0], student.name
+
+
+# --- на настоящей странице сайта --------------------------------------
+
+
+def real_week():
+    from bot.timetable.scraper import parse_schedule_html
+    from conftest import fixture
+
+    return parse_schedule_html(fixture("week_page_ru.html"), 474489, 2026)
+
+
+def test_real_page_subgroup_filtering():
+    """Неделя с сайта: у Шишлова QMBR-семинар — подгруппа 4, MPS — Шевчук 2."""
+    schedule = real_week()
+    filtered, report = filter_schedule(schedule, ME, roster)
+
+    kept = [event for day in filtered.days for event in day.events]
+    qmbr = [e for e in kept if "Количественные методы" in e.subject]
+    assert [e.subgroup for e in qmbr] == ["Подгруппа 4"]
+
+    mps = [e for e in kept if "Профессиональные навыки" in e.subject]
+    assert mps and all(e.subgroup == "Подгруппа 2" for e in mps)
+
+    assert report.hidden == 3, "три чужих семинара QMBR"
+
+
+def test_real_page_keeps_common_classes():
+    schedule = real_week()
+    filtered, _ = filter_schedule(schedule, ME, roster)
+    kept = {event.subject for day in filtered.days for event in day.events}
+    # Лекции без деления и факультативы остаются у всех
+    assert "Современный стратегический анализ, лекция" in kept
+    assert any("Иностранный язык" in subject for subject in kept)
+
+
+def test_real_page_for_another_cohort():
+    """Студент из подгруппы 1 видит свой семинар и не видит четвёртый."""
+    student = next(s for s in roster.students if s.cohorts["qmbr_seminars"] == "Coh.1")
+    filtered, _ = filter_schedule(real_week(), student, roster)
+    qmbr = [
+        event
+        for day in filtered.days
+        for event in day.events
+        if "Количественные методы" in event.subject
+    ]
+    assert [event.subgroup for event in qmbr] == ["Подгруппа 1"]
+
+
+def test_mps_educator_split_on_real_page():
+    """У студента с MPS у Замулина субботние пары Шевчука скрыты."""
+    student = next(s for s in roster.students if s.cohorts["mps_1"] == "Zamulin")
+    filtered, _ = filter_schedule(real_week(), student, roster)
+    mps = [
+        event
+        for day in filtered.days
+        for event in day.events
+        if "Профессиональные навыки" in event.subject
+    ]
+    assert mps == []
