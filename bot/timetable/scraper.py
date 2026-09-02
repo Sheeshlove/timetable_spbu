@@ -1,9 +1,9 @@
 """Резервный разбор HTML-страниц timetable.spbu.ru.
 
 Используется, когда JSON-API недоступен или изменился. Парсер намеренно
-терпим к разметке: он опирается на структуру ссылок (`/{alias}`,
-`/{alias}/StudentGroupEvents/Primary/{id}`) и на текстовые заголовки, а не
-на конкретные классы бутстрапа, которые на сайте меняются чаще всего.
+терпим к разметке: он опирается на структуру классов вида `day`,
+`study-event` и на текстовые заголовки, а не на конкретную вёрстку
+бутстрапа, которая на сайте меняется чаще всего.
 """
 
 from __future__ import annotations
@@ -13,12 +13,8 @@ from datetime import date, datetime
 
 from bs4 import BeautifulSoup, Tag
 
-from .api import program_key
-from .models import AdmissionYear, Day, Division, Event, Program, Schedule
+from .models import Day, Event, Schedule
 
-GROUP_LINK_RE = re.compile(r"/([A-Za-z0-9_-]+)/StudentGroupEvents/Primary/(\d+)")
-DIVISION_LINK_RE = re.compile(r"^/([A-Za-z0-9_-]+)/?$")
-YEAR_RE = re.compile(r"(19|20)\d{2}")
 DATE_RE = re.compile(r"(\d{1,2})\s+([А-Яа-яЁё]+)\s*(\d{4})?")
 TIME_RE = re.compile(r"\d{1,2}[:.]\d{2}\s*[–—-]\s*\d{1,2}[:.]\d{2}")
 DAY_CLASS_RE = re.compile(r"^days?(-(container|panel|wrapper|block))?$", re.I)
@@ -26,11 +22,6 @@ DAY_CLASS_RE = re.compile(r"^days?(-(container|panel|wrapper|block))?$", re.I)
 MONTHS = {
     "янва": 1, "февра": 2, "март": 3, "апре": 4, "мая": 5, "май": 5, "июн": 6,
     "июл": 7, "август": 8, "сентяб": 9, "октяб": 10, "нояб": 11, "декаб": 12,
-}
-
-_SKIP_ALIASES = {
-    "api", "home", "account", "search", "help", "about", "error", "content",
-    "scripts", "bundles", "images", "css", "js", "lib",
 }
 
 
@@ -55,96 +46,6 @@ def _outermost(nodes: list[Tag]) -> list[Tag]:
             continue
         result.append(node)
     return result
-
-
-def parse_divisions_html(html: str) -> list[Division]:
-    """Список подразделений с главной страницы."""
-    divisions: list[Division] = []
-    seen: set[str] = set()
-    for link in _soup(html).find_all("a", href=True):
-        match = DIVISION_LINK_RE.match(link["href"].split("?")[0])
-        if not match:
-            continue
-        alias = match.group(1)
-        if alias.lower() in _SKIP_ALIASES or alias in seen:
-            continue
-        name = _clean(link.get_text())
-        if not name:
-            continue
-        seen.add(alias)
-        divisions.append(Division(alias=alias, name=name))
-    return divisions
-
-
-def _year_links(container: Tag) -> list[tuple[str, str, int]]:
-    """Ссылки на группы внутри блока программы: (текст, alias, id)."""
-    found: list[tuple[str, str, int]] = []
-    for link in container.find_all("a", href=True):
-        match = GROUP_LINK_RE.search(link["href"])
-        if match:
-            found.append((_clean(link.get_text()), match.group(1), int(match.group(2))))
-    return found
-
-
-def _program_blocks(html: str) -> list[tuple[str, str, Tag]]:
-    """Блоки «уровень + название программы» вместе с их контейнером ссылок."""
-    soup = _soup(html)
-    blocks: list[tuple[str, str, Tag]] = []
-    current_level = ""
-    for node in soup.find_all(["h1", "h2", "h3", "h4", "h5", "div", "li", "section"]):
-        classes = " ".join(node.get("class") or [])
-        if node.name in {"h1", "h2", "h3"} and not _year_links(node):
-            text = _clean(node.get_text())
-            if text and len(text) < 120:
-                current_level = text
-            continue
-        if "panel" in classes or "accordion" in classes or node.name == "li":
-            links = _year_links(node)
-            if not links:
-                continue
-            heading = node.find(["h4", "h5", "a", "span", "strong"])
-            title = _clean(heading.get_text()) if heading else ""
-            if not title or YEAR_RE.fullmatch(title):
-                own_text = _clean(node.get_text())
-                for text, _alias, _gid in links:
-                    own_text = own_text.replace(text, " ")
-                title = _clean(own_text)[:120]
-            if title:
-                blocks.append((current_level, title, node))
-    return blocks
-
-
-def parse_programs_html(html: str) -> list[Program]:
-    programs: list[Program] = []
-    seen: set[str] = set()
-    for level, title, _node in _program_blocks(html):
-        key = program_key(level, title)
-        if key in seen:
-            continue
-        seen.add(key)
-        programs.append(Program(key=key, name=title, level=level))
-    return programs
-
-
-def parse_admission_years_html(html: str, key: str) -> list[AdmissionYear]:
-    years: list[AdmissionYear] = []
-    seen: set[int] = set()
-    for level, title, node in _program_blocks(html):
-        if program_key(level, title) != key:
-            continue
-        for text, _alias, group_id in _year_links(node):
-            if group_id in seen:
-                continue
-            seen.add(group_id)
-            year_match = YEAR_RE.search(text)
-            years.append(
-                AdmissionYear(
-                    program_id=0,
-                    name=year_match.group(0) if year_match else (text or str(group_id)),
-                    group_id=group_id,
-                )
-            )
-    return years
 
 
 def _parse_day_date(text: str, fallback_year: int | None = None) -> date | None:

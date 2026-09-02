@@ -1,29 +1,8 @@
-"""Разбор ответов JSON-API."""
+"""Разбор расписания из JSON-API."""
 
 from datetime import date
 
 from bot.timetable import api
-
-LEVELS = [
-    {
-        "StudyLevelName": "Магистратура",
-        "StudyProgramCombinations": [
-            {
-                "Name": "38.04.02 Менеджмент",
-                "AdmissionYears": [
-                    {"StudyProgramId": 12345, "YearName": "2026", "IsCurrent": True},
-                    {"StudyProgramId": 12000, "YearName": "2025", "IsCurrent": False},
-                ],
-            }
-        ],
-    },
-    {
-        "StudyLevelName": "Бакалавриат",
-        "StudyProgramCombinations": [
-            {"Name": "38.03.02 Менеджмент", "AdmissionYears": [{"StudyProgramId": 999, "YearName": "2026"}]}
-        ],
-    },
-]
 
 EVENTS = {
     "StudentGroupId": 474489,
@@ -50,40 +29,6 @@ EVENTS = {
 }
 
 
-def test_parse_divisions():
-    divisions = api.parse_divisions(
-        [{"Alias": "GSOM", "Name": "ВШМ", "Oid": "abc"}, {"Alias": "", "Name": "битая запись"}]
-    )
-    assert [d.alias for d in divisions] == ["GSOM"]
-    assert divisions[0].name == "ВШМ"
-
-
-def test_parse_programs_and_years():
-    programs = api.parse_programs(LEVELS)
-    assert [p.name for p in programs] == ["38.04.02 Менеджмент", "38.03.02 Менеджмент"]
-    assert programs[0].level == "Магистратура"
-
-    years = api.parse_admission_years(LEVELS, programs[0].key)
-    assert [(y.name, y.program_id) for y in years] == [("2026", 12345), ("2025", 12000)]
-    assert years[0].is_current is True
-
-    # ключ второго направления не должен подтягивать годы первого
-    other = api.parse_admission_years(LEVELS, programs[1].key)
-    assert [y.program_id for y in other] == [999]
-
-
-def test_parse_programs_ignores_unknown_shape():
-    assert api.parse_programs({"unexpected": True}) == []
-    assert api.parse_divisions(None) == []
-
-
-def test_parse_groups_accepts_both_shapes():
-    wrapped = api.parse_groups({"Groups": [{"StudentGroupId": 1, "StudentGroupName": "Гр. 1"}]})
-    bare = api.parse_groups([{"StudentGroupId": 1, "StudentGroupName": "Гр. 1"}])
-    assert wrapped == bare
-    assert wrapped[0].group_id == 1
-
-
 def test_parse_schedule():
     schedule = api.parse_schedule(EVENTS, 474489)
     assert schedule.group_name == "Менеджмент, 2026"
@@ -92,8 +37,21 @@ def test_parse_schedule():
     assert first.date == date(2026, 8, 31)
     assert first.events[0].subject == "Микроэкономика"
     assert first.events[0].interval == "10:00–11:35"
+    assert first.events[0].educators == "Иванов И. И."
     assert schedule.days[1].events == []
     assert schedule.is_empty is False
+
+
+def test_parse_schedule_ignores_unknown_shape():
+    assert api.parse_schedule({"unexpected": True}, 1).days == []
+    assert api.parse_schedule(None, 1).days == []
+
+
+def test_event_without_subject_is_skipped():
+    schedule = api.parse_schedule(
+        {"Days": [{"Day": "2026-08-31T00:00:00", "DayStudyEvents": [{"Subject": ""}]}]}, 1
+    )
+    assert schedule.days[0].events == []
 
 
 def test_event_interval_falls_back_to_start_end():

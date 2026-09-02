@@ -1,7 +1,7 @@
 [project]
 name = "timetable-spbu-bot"
 version = "1.0.0"
-description = "Телеграм-бот с расписанием СПбГУ и напоминаниями-заметками"
+description = "Телеграм-бот с расписанием MiM ВШМ СПбГУ по когортам и напоминаниями-заметками"
 requires-python = ">=3.11"
 dependencies = [
     "aiogram>=3.13,<4",
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "openpyxl>=3.1"]
 
 [project.scripts]
 timetable-spbu-bot = "bot.__main__:main"
@@ -22,7 +22,10 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["bot", "bot.handlers", "bot.timetable"]
+packages = ["bot", "bot.handlers", "bot.roster", "bot.timetable"]
+
+[tool.setuptools.package-data]
+"bot.roster" = ["*.json"]
 
 [tool.ruff]
 line-length = 100

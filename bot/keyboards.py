@@ -11,8 +11,6 @@ from aiogram.types import (
 
 from .scheduling import DAILY, MONTHLY, OFF, WEEKLY
 
-PER_PAGE = 8
-
 BTN_TODAY = "📅 Сегодня"
 BTN_WEEK = "🗓 Неделя"
 BTN_NOTES = "📝 Заметки"
@@ -30,46 +28,25 @@ def main_menu() -> ReplyKeyboardMarkup:
     )
 
 
-def options_keyboard(
-    labels: list[str],
-    step: str,
-    page: int = 0,
-    *,
-    per_page: int = PER_PAGE,
-    back_step: str | None = None,
-) -> InlineKeyboardMarkup:
-    """Список вариантов с постраничной навигацией.
-
-    В callback_data уходит индекс варианта в исходном списке, сам список
-    лежит в состоянии диалога — так подписи любой длины помещаются в лимит
-    Telegram в 64 байта.
-    """
-    pages = max(1, (len(labels) + per_page - 1) // per_page)
-    page = max(0, min(page, pages - 1))
-    start = page * per_page
-    rows: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton(text=_shorten(label), callback_data=f"pick:{step}:{start + offset}")]
-        for offset, label in enumerate(labels[start : start + per_page])
+def students_keyboard(labels: list[str]) -> InlineKeyboardMarkup:
+    """Кандидаты по фамилии: один вариант — одна кнопка."""
+    rows = [
+        [InlineKeyboardButton(text=_shorten(label), callback_data=f"student:{index}")]
+        for index, label in enumerate(labels)
     ]
-
-    if pages > 1:
-        nav = [
-            InlineKeyboardButton(
-                text="◀️", callback_data=f"nav:{step}:{page - 1}" if page > 0 else "noop"
-            ),
-            InlineKeyboardButton(text=f"{page + 1}/{pages}", callback_data="noop"),
-            InlineKeyboardButton(
-                text="▶️", callback_data=f"nav:{step}:{page + 1}" if page + 1 < pages else "noop"
-            ),
-        ]
-        rows.append(nav)
-
-    tail = []
-    if back_step:
-        tail.append(InlineKeyboardButton(text="↩️ Назад", callback_data=f"back:{back_step}"))
-    tail.append(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"))
-    rows.append(tail)
+    rows.append(
+        [InlineKeyboardButton(text="Меня нет в списке", callback_data="student:none")]
+    )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def confirm_student_keyboard(index: int = 0) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Это я", callback_data=f"student:{index}")],
+            [InlineKeyboardButton(text="🔁 Ввести фамилию заново", callback_data="student:retry")],
+        ]
+    )
 
 
 def frequency_keyboard(current: str | None = None) -> InlineKeyboardMarkup:
@@ -107,12 +84,16 @@ def time_keyboard(current_hour: int | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def settings_keyboard() -> InlineKeyboardMarkup:
+def settings_keyboard(show_all: bool = False) -> InlineKeyboardMarkup:
+    filter_title = (
+        "🔎 Показывать только мою когорту" if show_all else "📋 Показывать всё расписание"
+    )
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔔 Периодичность", callback_data="settings:freq")],
             [InlineKeyboardButton(text="⏰ Время отправки", callback_data="settings:time")],
-            [InlineKeyboardButton(text="🎓 Сменить группу", callback_data="settings:group")],
+            [InlineKeyboardButton(text=filter_title, callback_data="settings:filter")],
+            [InlineKeyboardButton(text="🎓 Сменить фамилию", callback_data="settings:student")],
         ]
     )
 

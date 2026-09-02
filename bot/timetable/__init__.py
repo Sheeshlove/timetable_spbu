@@ -1,16 +1,6 @@
 """Работа с сайтом расписания СПбГУ."""
 
 from .client import TimetableClient, TimetableError
-from .models import AdmissionYear, Day, Division, Event, Program, Schedule, StudentGroup
+from .models import Day, Event, Schedule
 
-__all__ = [
-    "AdmissionYear",
-    "Day",
-    "Division",
-    "Event",
-    "Program",
-    "Schedule",
-    "StudentGroup",
-    "TimetableClient",
-    "TimetableError",
-]
+__all__ = ["Day", "Event", "Schedule", "TimetableClient", "TimetableError"]

@@ -16,27 +16,22 @@ async def storage(tmp_path):
 
 
 def make(**overrides) -> Subscription:
-    defaults = dict(
-        user_id=1,
-        chat_id=100,
-        division_alias="GSOM",
-        division_name="ВШМ",
-        program_key="key",
-        program_name="Менеджмент",
-        year_name="2026",
-        group_id=474489,
-        group_name="Группа 1",
-    )
+    defaults = dict(user_id=1, chat_id=100, student_name="Shishlov Egor")
     defaults.update(overrides)
     return Subscription(**defaults)
 
 
 async def test_save_is_idempotent_upsert(storage):
     await storage.save_subscription(make(frequency="daily"))
-    await storage.save_subscription(make(frequency="weekly", group_id=999))
+    await storage.save_subscription(make(frequency="weekly", student_name="Morozov Ilia"))
     saved = await storage.get_subscription(1)
     assert saved.frequency == "weekly"
-    assert saved.group_id == 999
+    assert saved.student_name == "Morozov Ilia"
+
+
+async def test_show_all_flag_survives(storage):
+    await storage.save_subscription(make(show_all=True))
+    assert (await storage.get_subscription(1)).show_all is True
 
 
 async def test_missing_subscription_is_none(storage):

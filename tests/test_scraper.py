@@ -1,29 +1,9 @@
-"""Резервный разбор HTML."""
+"""Резервный разбор HTML расписания."""
 
 from datetime import date
 
 from bot.timetable import scraper
 from conftest import fixture
-
-
-def test_parse_divisions_skips_service_links():
-    divisions = scraper.parse_divisions_html(fixture("home_page.html"))
-    assert [d.alias for d in divisions] == ["GSOM", "MATH"]
-    assert divisions[0].name == "Высшая школа менеджмента"
-
-
-def test_parse_programs_keeps_level():
-    programs = scraper.parse_programs_html(fixture("division_page.html"))
-    names = {(p.level, p.name) for p in programs}
-    assert ("Магистратура", "38.04.02 Менеджмент") in names
-    assert ("Бакалавриат", "38.03.02 Менеджмент") in names
-
-
-def test_parse_years_links_to_group_ids():
-    html = fixture("division_page.html")
-    master = next(p for p in scraper.parse_programs_html(html) if p.level == "Магистратура")
-    years = scraper.parse_admission_years_html(html, master.key)
-    assert [(y.name, y.group_id) for y in years] == [("2026", 474489), ("2025", 460001)]
 
 
 def test_parse_schedule_html():

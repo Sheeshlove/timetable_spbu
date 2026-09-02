@@ -1,8 +1,11 @@
 """HTTP-клиент расписания СПбГУ.
 
-Сначала пробуется JSON-API (`/api/v1/...`), при ошибке — разбор HTML тех же
-разделов сайта. Ответы кэшируются на ``cache_ttl`` секунд, чтобы не ходить
-на сайт при каждом нажатии кнопки.
+Сначала пробуется JSON-API (`/api/v1/...`), при ошибке — разбор HTML той же
+страницы расписания. Ответы кэшируются на ``cache_ttl`` секунд, чтобы не
+ходить на сайт при каждом запросе.
+
+Бот обслуживает одну программу (MiM), поэтому справочники подразделений и
+программ клиенту не нужны: идентификатор группы задаётся настройкой.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from typing import Any
 import aiohttp
 
 from . import api, scraper
-from .models import AdmissionYear, Division, Program, Schedule, StudentGroup
+from .models import Schedule
 
 logger = logging.getLogger(__name__)
 
@@ -110,67 +113,6 @@ class TimetableClient:
             self._cache.set(cache_key, payload)
             return payload
         raise TimetableError(f"Не удалось загрузить {url}: {last_error}")
-
-    # --- Справочники ---------------------------------------------------
-
-    async def divisions(self) -> list[Division]:
-        try:
-            payload = await self._fetch(api.DIVISIONS_PATH, as_json=True)
-            divisions = api.parse_divisions(payload)
-            if divisions:
-                return divisions
-            logger.warning("JSON-API вернул пустой список подразделений, пробуем HTML")
-        except TimetableError as error:
-            logger.warning("JSON-API подразделений недоступен (%s), пробуем HTML", error)
-        html = await self._fetch("/", as_json=False)
-        divisions = scraper.parse_divisions_html(html)
-        if not divisions:
-            raise TimetableError("Не удалось получить список направлений")
-        return divisions
-
-    async def programs(self, alias: str) -> list[Program]:
-        payload = await self._programs_payload(alias)
-        programs = (
-            api.parse_programs(payload)
-            if isinstance(payload, (list, dict))
-            else scraper.parse_programs_html(payload)
-        )
-        if not programs:
-            raise TimetableError(f"Для «{alias}» не найдено ни одной программы")
-        return programs
-
-    async def admission_years(self, alias: str, program_key: str) -> list[AdmissionYear]:
-        payload = await self._programs_payload(alias)
-        years = (
-            api.parse_admission_years(payload, program_key)
-            if isinstance(payload, (list, dict))
-            else scraper.parse_admission_years_html(payload, program_key)
-        )
-        if not years:
-            raise TimetableError("Не найдено годов поступления для этой программы")
-        return years
-
-    async def _programs_payload(self, alias: str) -> Any:
-        """JSON-список уровней либо HTML страницы подразделения."""
-        try:
-            payload = await self._fetch(api.PROGRAMS_PATH.format(alias=alias), as_json=True)
-            if api.parse_programs(payload):
-                return payload
-            logger.warning("JSON-API вернул пустые программы для %s, пробуем HTML", alias)
-        except TimetableError as error:
-            logger.warning("JSON-API программ недоступен (%s), пробуем HTML", error)
-        return await self._fetch(f"/{alias}", as_json=False)
-
-    async def groups(self, year: AdmissionYear) -> list[StudentGroup]:
-        if year.group_id is not None:
-            return [StudentGroup(group_id=year.group_id, name=year.name)]
-        payload = await self._fetch(
-            api.GROUPS_PATH.format(program_id=year.program_id), as_json=True
-        )
-        groups = api.parse_groups(payload)
-        if not groups:
-            raise TimetableError("У этого года поступления нет учебных групп")
-        return groups
 
     # --- Расписание ----------------------------------------------------
 

@@ -13,6 +13,7 @@ from aiogram.types import BotCommand
 
 from .config import Settings, load_settings
 from .handlers import notes, schedule, setup
+from .roster import Roster, load_roster
 from .scheduler import Scheduler
 from .storage import Storage
 from .timetable import TimetableClient
@@ -20,7 +21,7 @@ from .timetable import TimetableClient
 logger = logging.getLogger(__name__)
 
 COMMANDS = [
-    BotCommand(command="start", description="Начать и выбрать группу"),
+    BotCommand(command="start", description="Начать и указать фамилию"),
     BotCommand(command="today", description="Расписание на сегодня"),
     BotCommand(command="tomorrow", description="Расписание на завтра"),
     BotCommand(command="week", description="Расписание на эту неделю"),
@@ -28,17 +29,21 @@ COMMANDS = [
     BotCommand(command="note", description="Новая заметка"),
     BotCommand(command="notes", description="Мои заметки"),
     BotCommand(command="delnote", description="Удалить заметку"),
+    BotCommand(command="cohorts", description="Мои когорты"),
     BotCommand(command="settings", description="Периодичность и время рассылки"),
-    BotCommand(command="setup", description="Заново выбрать группу"),
+    BotCommand(command="setup", description="Заново указать фамилию"),
     BotCommand(command="stop", description="Отключить рассылку"),
 ]
 
 
-def build_dispatcher(storage: Storage, client: TimetableClient, settings: Settings) -> Dispatcher:
+def build_dispatcher(
+    storage: Storage, client: TimetableClient, settings: Settings, roster: Roster
+) -> Dispatcher:
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher["storage"] = storage
     dispatcher["client"] = client
     dispatcher["settings"] = settings
+    dispatcher["roster"] = roster
     # Порядок важен: мастер настройки и команды идут раньше, чем перехват
     # свободного текста в заметках.
     dispatcher.include_router(setup.router)
@@ -63,12 +68,19 @@ async def run() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dispatcher = build_dispatcher(storage, client, settings)
-    scheduler = Scheduler(bot, storage, client, settings)
+    roster = load_roster(settings.roster_path) if settings.roster_path else load_roster()
+    dispatcher = build_dispatcher(storage, client, settings, roster)
+    scheduler = Scheduler(bot, storage, client, settings, roster)
 
     await bot.set_my_commands(COMMANDS)
     scheduler.start()
-    logger.info("Бот запущен, часовой пояс рассылки: %s", settings.tz_name)
+    logger.info(
+        "Бот запущен: программа «%s», группа %s, студентов в списке %s, пояс %s",
+        settings.program_title,
+        settings.group_id,
+        len(roster.students),
+        settings.tz_name,
+    )
     try:
         await dispatcher.start_polling(bot, allowed_updates=dispatcher.resolve_used_update_types())
     finally:

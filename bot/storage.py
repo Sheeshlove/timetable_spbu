@@ -10,21 +10,16 @@ import aiosqlite
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS subscriptions (
-    user_id        INTEGER PRIMARY KEY,
-    chat_id        INTEGER NOT NULL,
-    division_alias TEXT    NOT NULL,
-    division_name  TEXT    NOT NULL DEFAULT '',
-    program_key    TEXT    NOT NULL DEFAULT '',
-    program_name   TEXT    NOT NULL DEFAULT '',
-    year_name      TEXT    NOT NULL DEFAULT '',
-    group_id       INTEGER NOT NULL,
-    group_name     TEXT    NOT NULL DEFAULT '',
-    frequency      TEXT    NOT NULL DEFAULT 'off',
-    send_hour      INTEGER NOT NULL DEFAULT 8,
-    send_minute    INTEGER NOT NULL DEFAULT 0,
-    next_run_at    TEXT,
-    created_at     TEXT    NOT NULL,
-    updated_at     TEXT    NOT NULL
+    user_id      INTEGER PRIMARY KEY,
+    chat_id      INTEGER NOT NULL,
+    student_name TEXT    NOT NULL DEFAULT '',
+    show_all     INTEGER NOT NULL DEFAULT 0,
+    frequency    TEXT    NOT NULL DEFAULT 'off',
+    send_hour    INTEGER NOT NULL DEFAULT 8,
+    send_minute  INTEGER NOT NULL DEFAULT 0,
+    next_run_at  TEXT,
+    created_at   TEXT    NOT NULL,
+    updated_at   TEXT    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS notes (
@@ -66,13 +61,8 @@ def _parse(value: str | None) -> datetime | None:
 class Subscription:
     user_id: int
     chat_id: int
-    division_alias: str
-    division_name: str
-    program_key: str
-    program_name: str
-    year_name: str
-    group_id: int
-    group_name: str
+    student_name: str = ""
+    show_all: bool = False
     frequency: str = "off"
     send_hour: int = 8
     send_minute: int = 0
@@ -83,13 +73,8 @@ class Subscription:
         return cls(
             user_id=row["user_id"],
             chat_id=row["chat_id"],
-            division_alias=row["division_alias"],
-            division_name=row["division_name"],
-            program_key=row["program_key"],
-            program_name=row["program_name"],
-            year_name=row["year_name"],
-            group_id=row["group_id"],
-            group_name=row["group_name"],
+            student_name=row["student_name"],
+            show_all=bool(row["show_all"]),
             frequency=row["frequency"],
             send_hour=row["send_hour"],
             send_minute=row["send_minute"],
@@ -131,7 +116,38 @@ class Storage:
         self._db = await aiosqlite.connect(self.path)
         self._db.row_factory = aiosqlite.Row
         await self._db.execute("PRAGMA journal_mode=WAL")
+        await self._migrate()
         await self._db.executescript(SCHEMA)
+        await self._db.commit()
+
+    async def _migrate(self) -> None:
+        """Переезд со схемы, где студент выбирал направление и группу.
+
+        Расписание теперь одно — MiM, — а вместо группы хранится фамилия.
+        Настройки рассылки переносим, но снимаем с расписания: при первом
+        обращении бот попросит фамилию заново.
+        """
+        async with self._db.execute("PRAGMA table_info(subscriptions)") as cursor:
+            columns = {row["name"] for row in await cursor.fetchall()}
+        if not columns or "student_name" in columns:
+            return
+
+        await self._db.executescript(
+            """
+            ALTER TABLE subscriptions RENAME TO subscriptions_old;
+            """
+            + SCHEMA
+            + """
+            INSERT INTO subscriptions (
+                user_id, chat_id, student_name, show_all, frequency,
+                send_hour, send_minute, next_run_at, created_at, updated_at
+            )
+            SELECT user_id, chat_id, '', 0, frequency,
+                   send_hour, send_minute, NULL, created_at, updated_at
+            FROM subscriptions_old;
+            DROP TABLE subscriptions_old;
+            """
+        )
         await self._db.commit()
 
     async def close(self) -> None:
@@ -159,35 +175,24 @@ class Storage:
         await self.db.execute(
             """
             INSERT INTO subscriptions (
-                user_id, chat_id, division_alias, division_name, program_key, program_name,
-                year_name, group_id, group_name, frequency, send_hour, send_minute,
-                next_run_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                user_id, chat_id, student_name, show_all, frequency,
+                send_hour, send_minute, next_run_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
-                chat_id        = excluded.chat_id,
-                division_alias = excluded.division_alias,
-                division_name  = excluded.division_name,
-                program_key    = excluded.program_key,
-                program_name   = excluded.program_name,
-                year_name      = excluded.year_name,
-                group_id       = excluded.group_id,
-                group_name     = excluded.group_name,
-                frequency      = excluded.frequency,
-                send_hour      = excluded.send_hour,
-                send_minute    = excluded.send_minute,
-                next_run_at    = excluded.next_run_at,
-                updated_at     = excluded.updated_at
+                chat_id      = excluded.chat_id,
+                student_name = excluded.student_name,
+                show_all     = excluded.show_all,
+                frequency    = excluded.frequency,
+                send_hour    = excluded.send_hour,
+                send_minute  = excluded.send_minute,
+                next_run_at  = excluded.next_run_at,
+                updated_at   = excluded.updated_at
             """,
             (
                 subscription.user_id,
                 subscription.chat_id,
-                subscription.division_alias,
-                subscription.division_name,
-                subscription.program_key,
-                subscription.program_name,
-                subscription.year_name,
-                subscription.group_id,
-                subscription.group_name,
+                subscription.student_name,
+                int(subscription.show_all),
                 subscription.frequency,
                 subscription.send_hour,
                 subscription.send_minute,

@@ -15,11 +15,12 @@
 8. [Шаг 7. Настроить автозапуск через systemd](#шаг-7-настроить-автозапуск-через-systemd)
 9. [Шаг 8. Проверить бота в Telegram](#шаг-8-проверить-бота-в-telegram)
 10. [Логи и наблюдение](#логи-и-наблюдение)
-11. [Обновление](#обновление)
-12. [Резервные копии](#резервные-копии)
-13. [Вариант с Docker](#вариант-с-docker)
-14. [Устранение неполадок](#устранение-неполадок)
-15. [Удаление](#удаление)
+11. [Обновление списка студентов](#обновление-списка-студентов)
+12. [Обновление](#обновление)
+13. [Резервные копии](#резервные-копии)
+14. [Вариант с Docker](#вариант-с-docker)
+15. [Устранение неполадок](#устранение-неполадок)
+16. [Удаление](#удаление)
 
 ---
 
@@ -54,8 +55,8 @@
 Полезно сразу задать описание, чтобы пользователи понимали, что делает бот:
 
 ```
-/setdescription — Присылаю расписание СПбГУ и напоминаю о заметках
-/setabouttext  — Расписание занятий СПбГУ с timetable.spbu.ru
+/setdescription — Присылаю расписание MiM с учётом когорт и напоминаю о заметках
+/setabouttext  — Расписание занятий ВШМ СПбГУ с timetable.spbu.ru
 ```
 
 Список команд в меню бот выставляет сам при запуске — руками ничего делать
@@ -195,6 +196,9 @@ nano .env
 
 ```ini
 BOT_TOKEN=1234567890:AAHваш_токен_от_BotFather
+GROUP_ID=474489
+DIVISION_ALIAS=GSOM
+PROGRAM_TITLE=Master in Management, 2026
 DB_PATH=data/bot.sqlite3
 TZ_NAME=Europe/Moscow
 TIMETABLE_BASE_URL=https://timetable.spbu.ru
@@ -206,12 +210,19 @@ LOG_LEVEL=INFO
 | Переменная | Что делает |
 | --- | --- |
 | `BOT_TOKEN` | Токен от @BotFather. Обязательна |
+| `GROUP_ID` | Учебная группа MiM: число из адреса страницы расписания |
+| `DIVISION_ALIAS` | Псевдоним подразделения в адресах сайта |
+| `PROGRAM_TITLE` | Как программа называется в сообщениях бота |
+| `ROSTER_PATH` | Путь к списку студентов, если храните его вне репозитория |
 | `DB_PATH` | Файл базы SQLite. Относительный путь считается от каталога приложения |
 | `TZ_NAME` | Часовой пояс, в котором пользователь выбирает время рассылки |
 | `TIMETABLE_BASE_URL` | Адрес сайта расписания |
 | `HTTP_CACHE_TTL` | Сколько секунд держать ответы сайта в кэше |
 | `HTTP_TIMEOUT` | Таймаут запроса к сайту, секунды |
 | `LOG_LEVEL` | `INFO` для обычной работы, `DEBUG` при разборе проблем |
+
+Идентификатор группы берётся из адреса расписания на сайте:
+`https://timetable.spbu.ru/GSOM/StudentGroupEvents/Primary/`**`474489`**`/2026-08-31`
 
 Закройте файл от посторонних и отдайте каталог сервисному пользователю:
 
@@ -236,12 +247,19 @@ sudo -u timetable /opt/timetable_spbu/.venv/bin/python \
     /opt/timetable_spbu/scripts/probe_site.py --alias GSOM --group 474489
 ```
 
-Скрипт покажет, какой источник данных отвечает:
+Скрипт покажет, какой источник данных отвечает и что удалось разобрать:
 
 ```
-=== Подразделения ===
-✅ JSON-API: 34 шт. например: ['Высшая школа менеджмента', ...]
+=== Расписание группы 474489 (2026-08-31 — 2026-09-06) ===
+✅ JSON-API: 6 дней
+   2026-08-31:
+     • 10:45–12:20 Corporate Finance (Coh.2) | Окулов В. Л. | Волховский пер., 3
 ```
+
+Заодно посмотрите, **как сайт подписывает когорты** в названиях занятий: по
+этим подписям бот отбирает занятия конкретного студента. Если формат окажется
+не таким, как ожидалось («Coh.1», «когорта 1», «группа 2»), поправьте
+регулярные выражения в начале `bot/roster/filtering.py`.
 
 Если у всех строк `❌` — сайт недоступен с этого сервера либо изменил
 структуру. Бот запустится, но расписание отдавать не сможет; см.
@@ -264,7 +282,7 @@ cd /opt/timetable_spbu
 sudo -u timetable /opt/timetable_spbu/.venv/bin/python -m pytest -q
 ```
 
-Ожидается `99 passed`.
+Ожидается `147 passed`.
 
 ### Пробный запуск руками
 
@@ -322,9 +340,9 @@ systemctl disable --now timetable-bot   # выключить и убрать и�
 ## Шаг 8. Проверить бота в Telegram
 
 1. Откройте бота и отправьте `/start`.
-2. Пройдите мастер: направление → программа → год поступления → группа.
-3. Выберите периодичность и время рассылки.
-4. Отправьте `/today` — бот должен прислать расписание на сегодня.
+2. Напишите свою фамилию — бот покажет найденного студента и его когорты.
+3. Нажмите «Это я», выберите периодичность и время рассылки.
+4. Отправьте `/today` — придёт расписание на сегодня, уже без чужих когорт.
 5. Отправьте любой текст, например `сдать эссе`, и выберите день — бот
    подтвердит, что пришлёт заметку.
 
@@ -334,7 +352,10 @@ systemctl disable --now timetable-bot   # выключить и убрать и�
 sudo -u timetable /opt/timetable_spbu/.venv/bin/python - <<'PY'
 import sqlite3
 conn = sqlite3.connect("/opt/timetable_spbu/data/bot.sqlite3")
-for row in conn.execute("SELECT user_id, group_name, frequency, send_hour, next_run_at FROM subscriptions"):
+for row in conn.execute(
+    "SELECT user_id, student_name, show_all, frequency, send_hour, next_run_at"
+    " FROM subscriptions"
+):
     print(row)
 PY
 ```
@@ -370,6 +391,35 @@ SystemMaxUse=200M
 разбора верните `INFO` — на `DEBUG` пишется много.
 
 ---
+
+## Обновление списка студентов
+
+Распределение по когортам лежит в `bot/roster/mim_2026.json` и обновляется из
+таблицы деканата. Скрипту нужен `openpyxl` из dev-зависимостей:
+
+```bash
+cd /opt/timetable_spbu
+sudo -u timetable .venv/bin/pip install -r requirements-dev.txt
+sudo -u timetable .venv/bin/python scripts/import_cohorts.py \
+    ~/Cohorts_Distribution_MiM_2026.xlsx
+sudo systemctl restart timetable-bot
+```
+
+Скрипт печатает, сколько студентов прочитал и какие значения когорт нашёл по
+каждому предмету, — сверьтесь с таблицей перед перезапуском:
+
+```
+Студентов: 85
+Убраны строки-копии (3): №52 Meleshko Mikhail, ...
+  Corp. Finance    Coh.1, Coh.2
+  QMBR seminars    Coh.1, Coh.2, Coh.3, Coh.4
+  MPS I            Pavlovskaya, Shevchuk 1, Shevchuk 2, Zamulin
+```
+
+Если деканат переименует предмет, поправьте список `SUBJECTS` в начале
+скрипта — там же заданы подстроки, по которым занятие в расписании относят к
+предмету. Студенты, которых в новом списке нет, увидят расписание всей
+программы и просьбу указать фамилию заново.
 
 ## Обновление
 
@@ -493,6 +543,8 @@ journalctl -u timetable-bot -n 100 --no-pager
 | `TelegramConflictError: terminated by other getUpdates` | Запущено две копии бота с одним токеном | Оставьте одну: `systemctl stop timetable-bot` на лишнем сервере, проверьте `docker ps` |
 | `Сайт расписания не отвечает` у пользователей | `timetable.spbu.ru` недоступен с сервера | `curl -sI https://timetable.spbu.ru` — если не отвечает, проблема в сети сервера, а не в боте |
 | `probe_site.py` показывает `❌` у всех источников | Сайт сменил вёрстку или адреса | `python scripts/probe_site.py --dump tests/fixtures`, дальше правится `bot/timetable/api.py` или `scraper.py` |
+| Бот не нашёл фамилию студента | Его нет в `bot/roster/mim_2026.json` | Сверьте написание с таблицей деканата и переимпортируйте список |
+| Пропали занятия, которые должны быть | Фильтр принял метку за чужую когорту | Студент включает «Показывать всё расписание» в настройках; чинится в `bot/roster/filtering.py` |
 | `sqlite3.OperationalError: unable to open database file` | Нет прав на каталог `data` | `chown -R timetable:timetable /opt/timetable_spbu/data` |
 | `sqlite3.OperationalError: attempt to write a readonly database` | `ProtectSystem=strict` без `ReadWritePaths` | Проверьте строку `ReadWritePaths` в юните, `systemctl daemon-reload && systemctl restart timetable-bot` |
 | Рассылка приходит не в то время | Часовой пояс или часы сервера | `timedatectl` и значение `TZ_NAME` в `.env` |

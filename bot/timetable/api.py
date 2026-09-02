@@ -4,26 +4,19 @@
 доменные модели. Ключи ищутся без учёта регистра и в нескольких вариантах
 написания, потому что API отдаёт PascalCase, а часть эндпоинтов —
 camelCase.
+
+Бот работает с одной программой (MiM), поэтому справочники подразделений и
+образовательных программ здесь не разбираются — только расписание группы.
 """
 
 from __future__ import annotations
 
-import hashlib
 from datetime import date, datetime
 from typing import Any, Iterable
 
-from .models import AdmissionYear, Day, Division, Event, Program, Schedule, StudentGroup
+from .models import Day, Event, Schedule
 
-DIVISIONS_PATH = "/api/v1/study/divisions"
-PROGRAMS_PATH = "/api/v1/study/divisions/{alias}/programs/levels"
-GROUPS_PATH = "/api/v1/programs/{program_id}/groups"
 EVENTS_PATH = "/api/v1/groups/{group_id}/events/{start}/{end}"
-
-
-def program_key(level: str, name: str) -> str:
-    """Стабильный короткий идентификатор программы для callback_data."""
-    raw = f"{level.strip().lower()}|{name.strip().lower()}"
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
 
 def _get(data: Any, *names: str, default: Any = None) -> Any:
@@ -61,82 +54,6 @@ def _parse_dt(value: Any) -> datetime | None:
             continue
         return parsed.replace(tzinfo=None)
     return None
-
-
-def parse_divisions(payload: Any) -> list[Division]:
-    divisions: list[Division] = []
-    for item in _as_list(payload):
-        alias = _text(_get(item, "Alias", "PublicDivisionAlias"))
-        name = _text(_get(item, "Name", "Title", "NameRu")) or alias
-        if not alias:
-            continue
-        divisions.append(Division(alias=alias, name=name, oid=_text(_get(item, "Oid")) or None))
-    return divisions
-
-
-def parse_programs(payload: Any) -> list[Program]:
-    """Уровни обучения -> направления. Годы поступления берутся отдельно."""
-    programs: list[Program] = []
-    seen: set[str] = set()
-    for level in _as_list(payload):
-        level_name = _text(_get(level, "StudyLevelName", "Name", "LevelName"))
-        combinations = _get(
-            level, "StudyProgramCombinations", "Combinations", "Programs", default=[]
-        )
-        for combination in _as_list(combinations):
-            name = _text(_get(combination, "Name", "ProgramName", "Title"))
-            if not name:
-                continue
-            key = program_key(level_name, name)
-            if key in seen:
-                continue
-            seen.add(key)
-            programs.append(Program(key=key, name=name, level=level_name))
-    return programs
-
-
-def parse_admission_years(payload: Any, key: str) -> list[AdmissionYear]:
-    """Годы поступления для конкретного направления."""
-    years: list[AdmissionYear] = []
-    for level in _as_list(payload):
-        level_name = _text(_get(level, "StudyLevelName", "Name", "LevelName"))
-        combinations = _get(
-            level, "StudyProgramCombinations", "Combinations", "Programs", default=[]
-        )
-        for combination in _as_list(combinations):
-            name = _text(_get(combination, "Name", "ProgramName", "Title"))
-            if not name or program_key(level_name, name) != key:
-                continue
-            raw_years = _get(combination, "AdmissionYears", "Years", default=[])
-            for entry in _as_list(raw_years):
-                program_id = _get(entry, "StudyProgramId", "ProgramId", "Id")
-                if program_id is None:
-                    continue
-                years.append(
-                    AdmissionYear(
-                        program_id=int(program_id),
-                        name=_text(_get(entry, "YearName", "Name", "Year")) or str(program_id),
-                        is_current=bool(_get(entry, "IsCurrent", default=False)),
-                    )
-                )
-    return years
-
-
-def parse_groups(payload: Any) -> list[StudentGroup]:
-    raw = _get(payload, "Groups", "StudentGroups", default=payload)
-    groups: list[StudentGroup] = []
-    for item in _as_list(raw):
-        group_id = _get(item, "StudentGroupId", "GroupId", "Id")
-        if group_id is None:
-            continue
-        groups.append(
-            StudentGroup(
-                group_id=int(group_id),
-                name=_text(_get(item, "StudentGroupName", "Name", "DisplayName")) or str(group_id),
-                study_form=_text(_get(item, "StudentGroupStudyForm", "StudyForm")),
-            )
-        )
-    return groups
 
 
 def _parse_event(item: Any) -> Event | None:

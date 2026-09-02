@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from html import escape
 
+from .roster import Roster, Student
 from .scheduling import DAILY, FREQUENCY_TITLES, MONTHLY, WEEKLY
 from .storage import Note, Subscription
 from .timetable.models import Day, Schedule
@@ -48,7 +49,7 @@ def format_day(day: Day) -> str:
     return "\n".join(lines)
 
 
-def format_schedule(schedule: Schedule, header: str = "") -> str:
+def format_schedule(schedule: Schedule, header: str = "", footer: str = "") -> str:
     """Расписание целиком. Дни без занятий не печатаются, если их много."""
     parts: list[str] = []
     if header:
@@ -62,6 +63,8 @@ def format_schedule(schedule: Schedule, header: str = "") -> str:
         parts.append("\nЗанятий на этот период нет 🎉")
     else:
         parts.extend("\n" + format_day(day) for day in days)
+    if footer:
+        parts.append(f"\n<i>{escape(footer)}</i>")
     if schedule.url:
         parts.append(f'\n<a href="{escape(schedule.url, quote=True)}">Открыть на сайте</a>')
     return "\n".join(parts)
@@ -90,26 +93,47 @@ def split_message(text: str, limit: int = TELEGRAM_LIMIT) -> list[str]:
     return chunks
 
 
-def format_subscription(subscription: Subscription, tz) -> str:
+def format_cohorts(student: Student, roster: Roster) -> str:
+    """Список «предмет — когорта» для конкретного студента."""
+    pairs = roster.describe(student)
+    if not pairs:
+        return "Когорты для вас в списке не указаны."
+    lines = ["<b>Ваши когорты</b>"]
+    lines.extend(f"  · {escape(title)} — <b>{escape(value)}</b>" for title, value in pairs)
+    return "\n".join(lines)
+
+
+def format_subscription(subscription: Subscription, settings, roster: Roster) -> str:
     """Карточка текущих настроек."""
-    lines = [
-        "<b>Ваши настройки</b>",
-        f"🏛 Направление: {escape(subscription.division_name or subscription.division_alias)}",
-    ]
-    if subscription.program_name:
-        lines.append(f"🎓 Программа: {escape(subscription.program_name)}")
-    if subscription.year_name:
-        lines.append(f"📅 Год поступления: {escape(subscription.year_name)}")
-    if subscription.group_name:
-        lines.append(f"👥 Группа: {escape(subscription.group_name)}")
+    lines = ["<b>Ваши настройки</b>", f"🎓 Программа: {escape(settings.program_title)}"]
+
+    student = roster.get(subscription.student_name) if subscription.student_name else None
+    if student:
+        lines.append(f"👤 Вы: {escape(student.name)}")
+    elif subscription.student_name:
+        lines.append(
+            f"👤 Вы: {escape(subscription.student_name)} "
+            "(в текущем списке не найдены — обновите фамилию)"
+        )
+    else:
+        lines.append("👤 Фамилия не указана — показываю расписание всей программы")
+
+    if student:
+        lines.append(
+            "🔎 Показываю: "
+            + ("всё расписание" if subscription.show_all else "только занятия моих когорт")
+        )
     lines.append(
         f"🔔 Рассылка: {FREQUENCY_TITLES.get(subscription.frequency, subscription.frequency)}"
     )
     if subscription.frequency != "off":
         lines.append(f"⏰ Время: {subscription.send_time}")
         if subscription.next_run_at:
-            local = subscription.next_run_at.astimezone(tz)
+            local = subscription.next_run_at.astimezone(settings.tz)
             lines.append(f"➡️ Следующая отправка: {local:%d.%m.%Y %H:%M}")
+
+    if student and not subscription.show_all:
+        lines.append("\n" + format_cohorts(student, roster))
     return "\n".join(lines)
 
 

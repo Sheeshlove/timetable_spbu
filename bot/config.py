@@ -30,6 +30,10 @@ class Settings:
     http_cache_ttl: float
     http_timeout: float
     log_level: str
+    group_id: int
+    division_alias: str
+    program_title: str
+    roster_path: Path | None = None
 
     @property
     def tz(self) -> ZoneInfo:
@@ -53,4 +57,8 @@ def load_settings() -> Settings:
         http_cache_ttl=float(os.environ.get("HTTP_CACHE_TTL", "900")),
         http_timeout=float(os.environ.get("HTTP_TIMEOUT", "20")),
         log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        group_id=int(os.environ.get("GROUP_ID", "474489")),
+        division_alias=os.environ.get("DIVISION_ALIAS", "GSOM"),
+        program_title=os.environ.get("PROGRAM_TITLE", "Master in Management, 2026"),
+        roster_path=Path(os.environ["ROSTER_PATH"]) if os.environ.get("ROSTER_PATH") else None,
     )

@@ -17,6 +17,8 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 
 from .config import Settings
 from .formatting import digest_header, format_note_reminder, format_schedule, split_message
+from .handlers.schedule import apply_cohorts
+from .roster import Roster
 from .scheduling import next_run_at, period_for
 from .storage import Note, Storage, Subscription
 from .timetable import TimetableClient, TimetableError
@@ -38,6 +40,7 @@ class Scheduler:
         storage: Storage,
         client: TimetableClient,
         settings: Settings,
+        roster: Roster,
         *,
         tick_seconds: int = TICK_SECONDS,
     ) -> None:
@@ -45,6 +48,7 @@ class Scheduler:
         self.storage = storage
         self.client = client
         self.settings = settings
+        self.roster = roster
         self.tick_seconds = tick_seconds
         self._task: asyncio.Task | None = None
 
@@ -88,7 +92,7 @@ class Scheduler:
         start, end = period_for(subscription.frequency, moment, self.settings.tz)
         try:
             schedule = await self.client.schedule(
-                subscription.group_id, start, end, subscription.division_alias
+                self.settings.group_id, start, end, self.settings.division_alias
             )
         except TimetableError as error:
             # Сайт молчит — не теряем слот, пробуем ещё раз через 15 минут.
@@ -100,8 +104,11 @@ class Scheduler:
             return 0
 
         if not schedule.group_name:
-            schedule.group_name = subscription.group_name
-        text = format_schedule(schedule, digest_header(subscription.frequency, start, end))
+            schedule.group_name = self.settings.program_title
+        schedule, footer = apply_cohorts(schedule, subscription, self.roster)
+        text = format_schedule(
+            schedule, digest_header(subscription.frequency, start, end), footer
+        )
         status = await self._deliver(subscription.chat_id, text, user_id=subscription.user_id)
         if status == BLOCKED:
             # Рассылка уже снята в _deliver, следующий запуск не назначаем.

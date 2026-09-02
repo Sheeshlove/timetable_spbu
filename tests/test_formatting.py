@@ -3,18 +3,36 @@
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
+from pathlib import Path
+
+from bot.config import Settings
 from bot.formatting import (
     digest_header,
+    format_cohorts,
     format_notes,
     format_schedule,
     format_subscription,
     human_date,
     split_message,
 )
+from bot.roster import load_roster
 from bot.storage import Note, Subscription
 from bot.timetable.models import Day, Event, Schedule
 
 TZ = ZoneInfo("Europe/Moscow")
+ROSTER = load_roster()
+SETTINGS = Settings(
+    bot_token="t",
+    db_path=Path("x"),
+    tz_name="Europe/Moscow",
+    base_url="https://timetable.spbu.ru",
+    http_cache_ttl=0,
+    http_timeout=5,
+    log_level="INFO",
+    group_id=474489,
+    division_alias="GSOM",
+    program_title="Master in Management, 2026",
+)
 
 
 def sample(days=None) -> Schedule:
@@ -100,23 +118,40 @@ def test_format_subscription_shows_everything():
     subscription = Subscription(
         user_id=1,
         chat_id=1,
-        division_alias="GSOM",
-        division_name="ВШМ",
-        program_key="k",
-        program_name="38.04.02 Менеджмент",
-        year_name="2026",
-        group_id=474489,
-        group_name="Группа 1",
+        student_name="Shishlov Egor",
         frequency="daily",
         send_hour=8,
         send_minute=30,
         next_run_at=datetime(2026, 8, 31, 5, 30, tzinfo=timezone.utc),
     )
-    text = format_subscription(subscription, TZ)
-    assert "ВШМ" in text and "38.04.02 Менеджмент" in text and "2026" in text
+    text = format_subscription(subscription, SETTINGS, ROSTER)
+    assert "Master in Management" in text
+    assert "Shishlov Egor" in text
     assert "раз в день" in text
     assert "08:30" in text
     assert "31.08.2026 08:30" in text
+    assert "Coh.2" in text, "когорты видно прямо в карточке"
+
+
+def test_format_subscription_without_student():
+    text = format_subscription(Subscription(user_id=1, chat_id=1), SETTINGS, ROSTER)
+    assert "Фамилия не указана" in text
+
+
+def test_format_subscription_for_missing_student():
+    subscription = Subscription(user_id=1, chat_id=1, student_name="Кто-то Выбывший")
+    assert "не найдены" in format_subscription(subscription, SETTINGS, ROSTER)
+
+
+def test_format_cohorts():
+    text = format_cohorts(ROSTER.get("Shishlov Egor"), ROSTER)
+    assert "Corporate Finance" in text and "Coh.2" in text
+    assert "MPS I" in text and "Shevchuk 2" in text
+
+
+def test_schedule_footer_is_rendered():
+    text = format_schedule(sample(), "Заголовок", "Скрыто занятий других когорт: 2")
+    assert "Скрыто занятий других когорт: 2" in text
 
 
 def test_format_notes():
