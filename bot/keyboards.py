@@ -1,4 +1,4 @@
-"""Клавиатуры бота."""
+"""Клавиатуры бота. Все подписи берутся из переводчика."""
 
 from __future__ import annotations
 
@@ -9,63 +9,74 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
+from .i18n import LANGUAGE_NAMES, Translator
 from .scheduling import DAILY, MONTHLY, OFF, WEEKLY
 
-BTN_TODAY = "📅 Сегодня"
-BTN_WEEK = "🗓 Неделя"
-BTN_NOTES = "📝 Заметки"
-BTN_SETTINGS = "⚙️ Настройки"
 
-
-def main_menu() -> ReplyKeyboardMarkup:
+def main_menu(t: Translator) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_TODAY), KeyboardButton(text=BTN_WEEK)],
-            [KeyboardButton(text=BTN_NOTES), KeyboardButton(text=BTN_SETTINGS)],
+            [KeyboardButton(text=t("btn_today")), KeyboardButton(text=t("btn_week"))],
+            [KeyboardButton(text=t("btn_notes")), KeyboardButton(text=t("btn_settings"))],
         ],
         resize_keyboard=True,
-        input_field_placeholder="Выберите действие или напишите заметку",
+        input_field_placeholder=t("btn_placeholder"),
     )
 
 
-def students_keyboard(labels: list[str]) -> InlineKeyboardMarkup:
+def language_keyboard(current: str | None = None) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=("✅ " if code == current else "") + name,
+                    callback_data=f"lang:{code}",
+                )
+            ]
+            for code, name in LANGUAGE_NAMES.items()
+        ]
+    )
+
+
+def students_keyboard(labels: list[str], t: Translator) -> InlineKeyboardMarkup:
     """Кандидаты по фамилии: один вариант — одна кнопка."""
     rows = [
         [InlineKeyboardButton(text=_shorten(label), callback_data=f"student:{index}")]
         for index, label in enumerate(labels)
     ]
     rows.append(
-        [InlineKeyboardButton(text="Меня нет в списке", callback_data="student:none")]
+        [InlineKeyboardButton(text=t("btn_not_in_list"), callback_data="student:none")]
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def confirm_student_keyboard(index: int = 0) -> InlineKeyboardMarkup:
+def confirm_student_keyboard(t: Translator, index: int = 0) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Это я", callback_data=f"student:{index}")],
-            [InlineKeyboardButton(text="🔁 Ввести фамилию заново", callback_data="student:retry")],
+            [InlineKeyboardButton(text=t("btn_its_me"), callback_data=f"student:{index}")],
+            [InlineKeyboardButton(text=t("btn_retry_name"), callback_data="student:retry")],
         ]
     )
 
 
-def frequency_keyboard(current: str | None = None) -> InlineKeyboardMarkup:
+def frequency_keyboard(t: Translator, current: str | None = None) -> InlineKeyboardMarkup:
     options = [
-        (DAILY, "Раз в день"),
-        (WEEKLY, "Раз в неделю"),
-        (MONTHLY, "Раз в месяц"),
-        (OFF, "Не присылать"),
+        (DAILY, t("btn_daily")),
+        (WEEKLY, t("btn_weekly")),
+        (MONTHLY, t("btn_monthly")),
+        (OFF, t("btn_off")),
     ]
-    rows = [
-        [
-            InlineKeyboardButton(
-                text=("✅ " if code == current else "") + title,
-                callback_data=f"freq:{code}",
-            )
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=("✅ " if code == current else "") + title,
+                    callback_data=f"freq:{code}",
+                )
+            ]
+            for code, title in options
         ]
-        for code, title in options
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    )
 
 
 def time_keyboard(current_hour: int | None = None) -> InlineKeyboardMarkup:
@@ -84,42 +95,49 @@ def time_keyboard(current_hour: int | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def settings_keyboard(show_all: bool = False) -> InlineKeyboardMarkup:
-    filter_title = (
-        "🔎 Показывать только мою когорту" if show_all else "📋 Показывать всё расписание"
-    )
+def settings_keyboard(t: Translator, show_all: bool = False) -> InlineKeyboardMarkup:
+    filter_title = t("btn_settings_show_mine") if show_all else t("btn_settings_show_all")
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🔔 Периодичность", callback_data="settings:freq")],
-            [InlineKeyboardButton(text="⏰ Время отправки", callback_data="settings:time")],
+            [InlineKeyboardButton(text=t("btn_settings_freq"), callback_data="settings:freq")],
+            [InlineKeyboardButton(text=t("btn_settings_time"), callback_data="settings:time")],
             [InlineKeyboardButton(text=filter_title, callback_data="settings:filter")],
-            [InlineKeyboardButton(text="🎓 Сменить фамилию", callback_data="settings:student")],
+            [
+                InlineKeyboardButton(
+                    text=t("btn_settings_student"), callback_data="settings:student"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=t("btn_settings_language"), callback_data="settings:language"
+                )
+            ],
         ]
     )
 
 
-def note_day_keyboard() -> InlineKeyboardMarkup:
+def note_day_keyboard(t: Translator) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Сегодня", callback_data="noteday:0"),
-                InlineKeyboardButton(text="Завтра", callback_data="noteday:1"),
+                InlineKeyboardButton(text=t("btn_today_note"), callback_data="noteday:0"),
+                InlineKeyboardButton(text=t("btn_tomorrow"), callback_data="noteday:1"),
             ],
             [
-                InlineKeyboardButton(text="Послезавтра", callback_data="noteday:2"),
-                InlineKeyboardButton(text="Через неделю", callback_data="noteday:7"),
+                InlineKeyboardButton(text=t("btn_day_after"), callback_data="noteday:2"),
+                InlineKeyboardButton(text=t("btn_in_a_week"), callback_data="noteday:7"),
             ],
-            [InlineKeyboardButton(text="📆 Другая дата", callback_data="noteday:custom")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+            [InlineKeyboardButton(text=t("btn_other_date"), callback_data="noteday:custom")],
+            [InlineKeyboardButton(text=t("btn_cancel"), callback_data="cancel")],
         ]
     )
 
 
-def notes_menu_keyboard() -> InlineKeyboardMarkup:
+def notes_menu_keyboard(t: Translator) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="➕ Новая заметка", callback_data="note:new")],
-            [InlineKeyboardButton(text="📋 Список заметок", callback_data="note:list")],
+            [InlineKeyboardButton(text=t("btn_new_note"), callback_data="note:new")],
+            [InlineKeyboardButton(text=t("btn_note_list"), callback_data="note:list")],
         ]
     )
 

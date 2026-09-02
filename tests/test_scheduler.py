@@ -34,9 +34,11 @@ class FakeTimetable:
         self.schedule_result = schedule
         self.error = error
         self.calls: list[tuple[int, date, date]] = []
+        self.langs: list[str] = []
 
-    async def schedule(self, group_id, start, end, alias=None):
+    async def schedule(self, group_id, start, end, alias=None, lang="ru"):
         self.calls.append((group_id, start, end))
+        self.langs.append(lang)
         if self.error is not None:
             raise self.error
         return self.schedule_result

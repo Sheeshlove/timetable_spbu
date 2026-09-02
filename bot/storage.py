@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     user_id      INTEGER PRIMARY KEY,
     chat_id      INTEGER NOT NULL,
     student_name TEXT    NOT NULL DEFAULT '',
+    lang         TEXT    NOT NULL DEFAULT 'ru',
     show_all     INTEGER NOT NULL DEFAULT 0,
     frequency    TEXT    NOT NULL DEFAULT 'off',
     send_hour    INTEGER NOT NULL DEFAULT 8,
@@ -62,6 +63,7 @@ class Subscription:
     user_id: int
     chat_id: int
     student_name: str = ""
+    lang: str = "ru"
     show_all: bool = False
     frequency: str = "off"
     send_hour: int = 8
@@ -74,6 +76,7 @@ class Subscription:
             user_id=row["user_id"],
             chat_id=row["chat_id"],
             student_name=row["student_name"],
+            lang=row["lang"],
             show_all=bool(row["show_all"]),
             frequency=row["frequency"],
             send_hour=row["send_hour"],
@@ -129,7 +132,16 @@ class Storage:
         """
         async with self._db.execute("PRAGMA table_info(subscriptions)") as cursor:
             columns = {row["name"] for row in await cursor.fetchall()}
-        if not columns or "student_name" in columns:
+        if not columns:
+            return
+
+        if "student_name" in columns:
+            # Схема уже новая: добавляем колонки, появившиеся позже.
+            if "lang" not in columns:
+                await self._db.execute(
+                    "ALTER TABLE subscriptions ADD COLUMN lang TEXT NOT NULL DEFAULT 'ru'"
+                )
+                await self._db.commit()
             return
 
         await self._db.executescript(
@@ -139,10 +151,10 @@ class Storage:
             + SCHEMA
             + """
             INSERT INTO subscriptions (
-                user_id, chat_id, student_name, show_all, frequency,
+                user_id, chat_id, student_name, lang, show_all, frequency,
                 send_hour, send_minute, next_run_at, created_at, updated_at
             )
-            SELECT user_id, chat_id, '', 0, frequency,
+            SELECT user_id, chat_id, '', 'ru', 0, frequency,
                    send_hour, send_minute, NULL, created_at, updated_at
             FROM subscriptions_old;
             DROP TABLE subscriptions_old;
@@ -175,12 +187,13 @@ class Storage:
         await self.db.execute(
             """
             INSERT INTO subscriptions (
-                user_id, chat_id, student_name, show_all, frequency,
+                user_id, chat_id, student_name, lang, show_all, frequency,
                 send_hour, send_minute, next_run_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 chat_id      = excluded.chat_id,
                 student_name = excluded.student_name,
+                lang         = excluded.lang,
                 show_all     = excluded.show_all,
                 frequency    = excluded.frequency,
                 send_hour    = excluded.send_hour,
@@ -192,6 +205,7 @@ class Storage:
                 subscription.user_id,
                 subscription.chat_id,
                 subscription.student_name,
+                subscription.lang,
                 int(subscription.show_all),
                 subscription.frequency,
                 subscription.send_hour,

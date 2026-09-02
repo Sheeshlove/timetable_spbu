@@ -19,14 +19,8 @@ from ..formatting import (
     now_local,
     split_message,
 )
-from ..keyboards import (
-    BTN_SETTINGS,
-    BTN_TODAY,
-    BTN_WEEK,
-    frequency_keyboard,
-    settings_keyboard,
-    time_keyboard,
-)
+from ..i18n import TEXTS, Translator
+from ..keyboards import frequency_keyboard, settings_keyboard, time_keyboard
 from ..roster import Roster
 from ..roster.filtering import filter_schedule
 from ..storage import Storage, Subscription
@@ -35,11 +29,14 @@ from ..timetable import Schedule, TimetableClient, TimetableError
 logger = logging.getLogger(__name__)
 router = Router(name="schedule")
 
-NOT_CONFIGURED = "Сначала напишите фамилию — это займёт полминуты: /setup"
+
+def menu_button(key: str):
+    """Фильтр по подписи кнопки главного меню на любом языке."""
+    return F.text.in_({TEXTS[lang][key] for lang in TEXTS})
 
 
 def apply_cohorts(
-    schedule: Schedule, subscription: Subscription, roster: Roster
+    schedule: Schedule, subscription: Subscription, roster: Roster, t: Translator
 ) -> tuple[Schedule, str]:
     """Оставляет занятия когорт студента и возвращает подпись под расписанием."""
     if subscription.show_all or not subscription.student_name:
@@ -47,14 +44,11 @@ def apply_cohorts(
     student = roster.get(subscription.student_name)
     if student is None:
         logger.info("Студент %s не найден в списке", subscription.student_name)
-        return schedule, "Вас нет в текущем списке программы — показываю всё расписание."
+        return schedule, t("not_in_roster")
     filtered, report = filter_schedule(schedule, student, roster)
     if not report.hidden:
         return filtered, ""
-    return filtered, (
-        f"Скрыто занятий других когорт: {report.hidden}. "
-        "Показать всё: «⚙️ Настройки»."
-    )
+    return filtered, t("hidden_note", count=report.hidden)
 
 
 async def send_schedule(
@@ -63,48 +57,50 @@ async def send_schedule(
     client: TimetableClient,
     settings: Settings,
     roster: Roster,
+    t: Translator,
     start: date,
     end: date,
     header: str,
 ) -> None:
     subscription = await storage.get_subscription(message.from_user.id)
     if subscription is None:
-        await message.answer(NOT_CONFIGURED)
+        await message.answer(t("not_configured"))
         return
-    notice = await message.answer("Смотрю расписание…")
+    notice = await message.answer(t("loading"))
     try:
         schedule = await client.schedule(
-            settings.group_id, start, end, settings.division_alias
+            settings.group_id, start, end, settings.division_alias, t.lang
         )
     except TimetableError as error:
         logger.warning("Расписание не загрузилось: %s", error)
-        await notice.edit_text("Сайт расписания не отвечает 😕 Попробуйте позже.")
+        await notice.edit_text(t("site_down"))
         return
     if not schedule.group_name:
         schedule.group_name = settings.program_title
 
-    schedule, footer = apply_cohorts(schedule, subscription, roster)
-    chunks = split_message(format_schedule(schedule, header, footer))
+    schedule, footer = apply_cohorts(schedule, subscription, roster, t)
+    chunks = split_message(format_schedule(schedule, t, header, footer))
     await notice.edit_text(chunks[0], disable_web_page_preview=True)
     for chunk in chunks[1:]:
         await message.answer(chunk, disable_web_page_preview=True)
 
 
 @router.message(Command("today"))
-@router.message(F.text == BTN_TODAY)
+@router.message(menu_button("btn_today"))
 async def cmd_today(
     message: Message,
     storage: Storage,
     client: TimetableClient,
     settings: Settings,
     roster: Roster,
+    t: Translator,
 ) -> None:
     # Дата берётся в часовом поясе рассылки, а не в поясе сервера: иначе
     # ночью «сегодня» съедет на сутки.
     today = now_local(settings.tz).date()
     await send_schedule(
-        message, storage, client, settings, roster, today, today,
-        f"Расписание на {human_date(today)}",
+        message, storage, client, settings, roster, t, today, today,
+        t("header_day", date=human_date(today, t)),
     )
 
 
@@ -115,30 +111,28 @@ async def cmd_tomorrow(
     client: TimetableClient,
     settings: Settings,
     roster: Roster,
+    t: Translator,
 ) -> None:
     day = now_local(settings.tz).date() + timedelta(days=1)
     await send_schedule(
-        message, storage, client, settings, roster, day, day,
-        f"Расписание на {human_date(day)}",
+        message, storage, client, settings, roster, t, day, day,
+        t("header_day", date=human_date(day, t)),
     )
 
 
 @router.message(Command("week"))
-@router.message(F.text == BTN_WEEK)
+@router.message(menu_button("btn_week"))
 async def cmd_week(
     message: Message,
     storage: Storage,
     client: TimetableClient,
     settings: Settings,
     roster: Roster,
+    t: Translator,
 ) -> None:
     today = now_local(settings.tz).date()
     monday = today - timedelta(days=today.weekday())
-    sunday = monday + timedelta(days=6)
-    await send_schedule(
-        message, storage, client, settings, roster, monday, sunday,
-        f"Расписание на неделю {monday:%d.%m} — {sunday:%d.%m}",
-    )
+    await _send_week(message, storage, client, settings, roster, t, monday)
 
 
 @router.message(Command("nextweek"))
@@ -148,18 +142,33 @@ async def cmd_next_week(
     client: TimetableClient,
     settings: Settings,
     roster: Roster,
+    t: Translator,
 ) -> None:
     today = now_local(settings.tz).date()
     monday = today - timedelta(days=today.weekday()) + timedelta(days=7)
+    await _send_week(message, storage, client, settings, roster, t, monday)
+
+
+async def _send_week(
+    message: Message,
+    storage: Storage,
+    client: TimetableClient,
+    settings: Settings,
+    roster: Roster,
+    t: Translator,
+    monday: date,
+) -> None:
     sunday = monday + timedelta(days=6)
     await send_schedule(
-        message, storage, client, settings, roster, monday, sunday,
-        f"Расписание на неделю {monday:%d.%m} — {sunday:%d.%m}",
+        message, storage, client, settings, roster, t, monday, sunday,
+        t("header_week", start=f"{monday:%d.%m}", end=f"{sunday:%d.%m}"),
     )
 
 
 @router.message(Command("cohorts"))
-async def cmd_cohorts(message: Message, storage: Storage, roster: Roster) -> None:
+async def cmd_cohorts(
+    message: Message, storage: Storage, roster: Roster, t: Translator
+) -> None:
     subscription = await storage.get_subscription(message.from_user.id)
     student = (
         roster.get(subscription.student_name)
@@ -167,77 +176,87 @@ async def cmd_cohorts(message: Message, storage: Storage, roster: Roster) -> Non
         else None
     )
     if student is None:
-        await message.answer(
-            "Фамилия не указана или вас нет в списке программы. Указать: /setup"
-        )
+        await message.answer(t("cohorts_unknown"))
         return
-    await message.answer(format_cohorts(student, roster))
+    await message.answer(format_cohorts(student, roster, t))
 
 
 @router.message(Command("settings"))
-@router.message(F.text == BTN_SETTINGS)
+@router.message(menu_button("btn_settings"))
 async def cmd_settings(
-    message: Message, storage: Storage, settings: Settings, roster: Roster
+    message: Message, storage: Storage, settings: Settings, roster: Roster, t: Translator
 ) -> None:
     subscription = await storage.get_subscription(message.from_user.id)
     if subscription is None:
-        await message.answer(NOT_CONFIGURED)
+        await message.answer(t("not_configured"))
         return
     await message.answer(
-        format_subscription(subscription, settings, roster),
-        reply_markup=settings_keyboard(subscription.show_all),
+        format_subscription(subscription, settings, roster, t),
+        reply_markup=settings_keyboard(t, subscription.show_all),
     )
 
 
 @router.callback_query(F.data == "settings:freq")
-async def on_settings_frequency(callback: CallbackQuery, storage: Storage) -> None:
+async def on_settings_frequency(
+    callback: CallbackQuery, storage: Storage, t: Translator
+) -> None:
     subscription = await storage.get_subscription(callback.from_user.id)
     await callback.answer()
     await callback.message.answer(
-        "Как часто присылать расписание?",
-        reply_markup=frequency_keyboard(subscription.frequency if subscription else None),
+        t("ask_frequency"),
+        reply_markup=frequency_keyboard(
+            t, subscription.frequency if subscription else None
+        ),
     )
 
 
 @router.callback_query(F.data == "settings:time")
 async def on_settings_time(
-    callback: CallbackQuery, storage: Storage, settings: Settings, state: FSMContext
+    callback: CallbackQuery,
+    storage: Storage,
+    settings: Settings,
+    state: FSMContext,
+    t: Translator,
 ) -> None:
     from .setup import SetupStates  # локальный импорт: избегаем цикла модулей
 
     subscription = await storage.get_subscription(callback.from_user.id)
     if subscription is None:
-        await callback.answer("Сначала /setup", show_alert=True)
+        await callback.answer(t("setup_first"), show_alert=True)
         return
     await callback.answer()
     await state.update_data(frequency=subscription.frequency)
     await state.set_state(SetupStates.send_time)
     await callback.message.answer(
-        f"В какое время присылать? Часовой пояс — {settings.tz_name}.",
+        t("ask_time_short", tz=settings.tz_name),
         reply_markup=time_keyboard(subscription.send_hour),
     )
 
 
 @router.callback_query(F.data == "settings:filter")
 async def on_settings_filter(
-    callback: CallbackQuery, storage: Storage, settings: Settings, roster: Roster
+    callback: CallbackQuery,
+    storage: Storage,
+    settings: Settings,
+    roster: Roster,
+    t: Translator,
 ) -> None:
     subscription = await storage.get_subscription(callback.from_user.id)
     if subscription is None:
-        await callback.answer("Сначала /setup", show_alert=True)
+        await callback.answer(t("setup_first"), show_alert=True)
         return
     subscription.show_all = not subscription.show_all
     await storage.save_subscription(subscription)
     await callback.answer(
-        "Показываю всё расписание" if subscription.show_all else "Показываю только мои когорты"
+        t("toast_show_all") if subscription.show_all else t("toast_show_mine")
     )
     await callback.message.edit_text(
-        format_subscription(subscription, settings, roster),
-        reply_markup=settings_keyboard(subscription.show_all),
+        format_subscription(subscription, settings, roster, t),
+        reply_markup=settings_keyboard(t, subscription.show_all),
     )
 
 
 @router.message(Command("stop"))
-async def cmd_stop(message: Message, storage: Storage) -> None:
+async def cmd_stop(message: Message, storage: Storage, t: Translator) -> None:
     await storage.delete_subscription(message.from_user.id)
-    await message.answer("Рассылка выключена, настройки удалены. Вернуться: /setup")
+    await message.answer(t("stopped"))

@@ -36,9 +36,11 @@ class StubTimetable:
 
     def __init__(self) -> None:
         self.schedule_calls: list[tuple[int, date, date]] = []
+        self.languages: list[str] = []
 
-    async def schedule(self, group_id, start, end, alias=None):
+    async def schedule(self, group_id, start, end, alias=None, lang="ru"):
         self.schedule_calls.append((group_id, start, end))
+        self.languages.append(lang)
         return Schedule(
             group_id=group_id,
             group_name="MiM 2026",
@@ -88,27 +90,44 @@ async def app(tmp_path: Path, dispatcher):
     await storage.close()
 
 
-async def complete_setup(telegram, surname: str = "Шишлов") -> None:
+CONFIRM = {"Русский": "Это я", "English": "That's me"}
+EVERY_DAY = {"Русский": "Раз в день", "English": "Every day"}
+
+
+async def complete_setup(telegram, surname: str = "Шишлов", language: str = "Русский") -> None:
     await telegram.send("/start")
+    await telegram.click_button(language)
     await telegram.send(surname)
-    await telegram.click_button("Это я")
-    await telegram.click_button("Раз в день")
+    await telegram.click_button(CONFIRM[language])
+    await telegram.click_button(EVERY_DAY[language])
     await telegram.click_button("08:00")
 
 
 # --- Знакомство --------------------------------------------------------
 
 
-async def test_start_asks_for_surname(app):
+async def test_start_asks_for_language_first(app):
     telegram, _, _ = app
     await telegram.send("/start")
-    assert "Master in Management" in telegram.session.texts[0]
+    assert "Choose your language" in telegram.session.texts[-1]
+    labels = list(telegram.session.buttons())
+    assert any("Русский" in label for label in labels)
+    assert any("English" in label for label in labels)
+    assert any(label.startswith("✅") for label in labels), "текущий язык отмечен"
+
+
+async def test_language_choice_leads_to_surname(app):
+    telegram, _, _ = app
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    assert "Master in Management" in telegram.session.texts[-2]
     assert "фамилия" in telegram.session.texts[-1].lower()
 
 
 async def test_surname_lookup_shows_cohorts_and_saves(app):
     telegram, storage, _ = app
     await telegram.send("/start")
+    await telegram.click_button("Русский")
     await telegram.send("Шишлов")
 
     confirmation = telegram.session.texts[-1]
@@ -131,6 +150,7 @@ async def test_surname_lookup_shows_cohorts_and_saves(app):
 async def test_latin_surname_also_works(app):
     telegram, storage, _ = app
     await telegram.send("/start")
+    await telegram.click_button("Русский")
     await telegram.send("Iurchenko")
     await telegram.click_button("Это я")
     assert (await storage.get_subscription(777)).student_name == "Iurchenko Kseniia"
@@ -139,6 +159,7 @@ async def test_latin_surname_also_works(app):
 async def test_unknown_surname_offers_full_schedule(app):
     telegram, storage, _ = app
     await telegram.send("/start")
+    await telegram.click_button("Русский")
     await telegram.send("Пупкин")
     assert "Не нашёл такой фамилии" in telegram.session.texts[-1]
 
@@ -151,6 +172,7 @@ async def test_unknown_surname_offers_full_schedule(app):
 async def test_retry_button_asks_surname_again(app):
     telegram, storage, _ = app
     await telegram.send("/start")
+    await telegram.click_button("Русский")
     await telegram.send("Шишлов")
     await telegram.click_button("Ввести фамилию заново")
     assert "фамилия" in telegram.session.texts[-1].lower()
@@ -216,7 +238,7 @@ async def test_cohorts_command(app):
 
     await telegram.send("/cohorts")
     text = telegram.session.texts[-1]
-    assert "QMBR, семинары" in text and "Coh.4" in text
+    assert "Количественные методы, семинары" in text and "Coh.4" in text
 
 
 # --- Настройки ---------------------------------------------------------
@@ -355,7 +377,99 @@ async def test_html_in_note_does_not_break_message(app):
 async def test_menu_button_during_setup_is_not_treated_as_surname(app):
     telegram, _, _ = app
     await telegram.send("/start")
+    await telegram.click_button("Русский")
     telegram.session.clear()
 
     await telegram.send("📝 Заметки")
     assert "заметок" in telegram.session.texts[-1].lower()
+
+
+# --- Язык --------------------------------------------------------------
+
+
+async def test_english_setup_speaks_english(app):
+    telegram, storage, timetable = app
+    await telegram.send("/start")
+    await telegram.click_button("English")
+
+    assert "Language switched to English" in telegram.session.texts[-3]
+    assert "last name" in telegram.session.texts[-1]
+
+    await telegram.send("Shishlov")
+    assert "Is this you?" in telegram.session.texts[-1]
+
+    await telegram.click_button("That's me")
+    await telegram.click_button("Every day")
+    assert "At what time" in telegram.session.texts[-1]
+
+    await telegram.click_button("08:00")
+    saved = await storage.get_subscription(777)
+    assert saved.lang == "en"
+    assert "Your settings" in telegram.session.texts[-2]
+
+
+async def test_language_reaches_the_timetable_site(app):
+    telegram, _, timetable = app
+    await complete_setup(telegram, language="English")
+    telegram.session.clear()
+
+    await telegram.send("/today")
+    assert timetable.languages[-1] == "en", "сайт запрашиваем на языке пользователя"
+
+
+async def test_language_can_be_switched_later(app):
+    telegram, storage, _ = app
+    await complete_setup(telegram)
+    assert (await storage.get_subscription(777)).lang == "ru"
+
+    await telegram.send("/settings")
+    await telegram.click_button("Язык")
+    await telegram.click_button("English")
+
+    saved = await storage.get_subscription(777)
+    assert saved.lang == "en"
+    assert saved.student_name == "Shishlov Egor", "смена языка не теряет студента"
+    assert saved.frequency == DAILY
+
+    telegram.session.clear()
+    await telegram.send("/settings")
+    card = telegram.session.texts[-1]
+    assert "Your settings" in card and "Managerial and Professional Skills I" in card
+
+
+async def test_english_notes(app):
+    telegram, storage, _ = app
+    await complete_setup(telegram, language="English")
+    telegram.session.clear()
+
+    await telegram.send("/note")
+    assert "Type the note" in telegram.session.texts[-1]
+
+    await telegram.send("Submit the essay")
+    assert "When should I remind you" in telegram.session.texts[-1]
+
+    await telegram.click_button("Tomorrow")
+    assert "Saved" in telegram.session.texts[-1]
+    notes = await storage.pending_notes(777)
+    assert notes[0].text == "Submit the essay"
+
+
+async def test_english_one_liner_note(app):
+    telegram, storage, _ = app
+    await complete_setup(telegram, language="English")
+
+    await telegram.send("/note in 3 days deadline for the case")
+    notes = await storage.pending_notes(777)
+    assert notes[0].text == "deadline for the case"
+
+
+async def test_menu_buttons_work_in_english(app):
+    telegram, _, timetable = app
+    await complete_setup(telegram, language="English")
+    telegram.session.clear()
+
+    await telegram.send("📅 Today")
+    assert timetable.schedule_calls, "английская кнопка «Today» открывает расписание"
+
+    await telegram.send("⚙️ Settings")
+    assert "Your settings" in telegram.session.texts[-1]

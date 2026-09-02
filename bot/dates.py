@@ -10,25 +10,36 @@ RELATIVE = {
     "сегодня": 0,
     "завтра": 1,
     "послезавтра": 2,
+    "today": 0,
+    "tomorrow": 1,
+    "day after tomorrow": 2,
 }
 
 WEEKDAY_WORDS = {
     "понедельник": 0, "вторник": 1, "среда": 2, "среду": 2, "четверг": 3,
     "пятница": 4, "пятницу": 4, "суббота": 5, "субботу": 5, "воскресенье": 6,
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
 }
 
 MONTH_WORDS = {
     "январ": 1, "феврал": 2, "март": 3, "апрел": 4, "ма": 5, "июн": 6,
     "июл": 7, "август": 8, "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12,
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
 DATE_DOTTED = re.compile(r"\b(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?\b")
 DATE_ISO = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b")
-DATE_WORDS = re.compile(r"\b(\d{1,2})\s+([а-яё]{3,})\b", re.IGNORECASE)
+DATE_WORDS = re.compile(r"\b(\d{1,2})\s+([а-яёa-z]{3,})\b", re.IGNORECASE)
+# «September 5», «Sep 5» — в английском месяц идёт первым
+DATE_WORDS_EN = re.compile(r"\b([a-z]{3,})\s+(\d{1,2})\b", re.IGNORECASE)
 TIME_COLON = re.compile(r"\b(\d{1,2}):(\d{2})\b")
 TIME_DOTTED = re.compile(r"\b(\d{1,2})\.(\d{2})\b")
-IN_DAYS = re.compile(r"через\s+(\d{1,3})\s*(день|дня|дней|недел\w*)", re.IGNORECASE)
-LEADING_PREPOSITION = re.compile(r"^(?:в|во|на|к|ко|до|по)\s+", re.IGNORECASE)
+IN_DAYS = re.compile(
+    r"(?:через|in)\s+(\d{1,3})\s*(день|дня|дней|недел\w*|days?|weeks?)", re.IGNORECASE
+)
+LEADING_PREPOSITION = re.compile(r"^(?:в|во|на|к|ко|до|по|on|at|by)\s+", re.IGNORECASE)
 
 
 class DateParseError(ValueError):
@@ -129,7 +140,8 @@ def _extract_date(text: str, today: date) -> tuple[date | None, tuple[int, int]]
     match = IN_DAYS.search(text)
     if match:
         amount = int(match.group(1))
-        step = 7 if match.group(2).lower().startswith("недел") else 1
+        unit = match.group(2).lower()
+        step = 7 if unit.startswith(("недел", "week")) else 1
         return today + timedelta(days=amount * step), match.span()
 
     match = DATE_ISO.search(text)
@@ -151,10 +163,14 @@ def _extract_date(text: str, today: date) -> tuple[date | None, tuple[int, int]]
             parsed = _safe_date(year + 1, month, day)
         return parsed, match.span()
 
-    match = DATE_WORDS.search(text)
-    if match:
-        day = int(match.group(1))
-        word = match.group(2).lower()
+    for pattern, order in ((DATE_WORDS, "dm"), (DATE_WORDS_EN, "md")):
+        match = pattern.search(text)
+        if not match:
+            continue
+        if order == "dm":
+            day, word = int(match.group(1)), match.group(2).lower()
+        else:
+            word, day = match.group(1).lower(), int(match.group(2))
         for prefix, month in sorted(MONTH_WORDS.items(), key=lambda item: -len(item[0])):
             if word.startswith(prefix):
                 parsed = _safe_date(today.year, month, day)

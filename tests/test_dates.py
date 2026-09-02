@@ -68,3 +68,33 @@ def test_unparseable_dates_raise(text):
 def test_invalid_time_raises():
     with pytest.raises(DateParseError):
         parse_due("05.09 99:99", TZ, now=NOW)
+
+
+# --- английские формулировки ------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("today 23:00", "28.08.2026 23:00"),
+        ("tomorrow", "29.08.2026 09:00"),
+        ("in 3 days", "31.08.2026 09:00"),
+        ("in 2 weeks", "11.09.2026 09:00"),
+        ("September 5", "05.09.2026 09:00"),
+        ("Sep 5 18:30", "05.09.2026 18:30"),
+        ("on Friday", "04.09.2026 09:00"),
+        ("on Monday", "31.08.2026 09:00"),
+    ],
+)
+def test_parse_due_english(text, expected):
+    assert local(text).strftime("%d.%m.%Y %H:%M") == expected
+
+
+def test_split_due_english_note():
+    due, rest = split_due("in 3 days deadline for the case", TZ, now=NOW)
+    assert due.astimezone(TZ).strftime("%d.%m") == "31.08"
+    assert rest == "deadline for the case"
+
+
+def test_split_due_strips_english_preposition():
+    assert split_due("on Friday exam", TZ, now=NOW)[1] == "exam"

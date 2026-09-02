@@ -15,11 +15,14 @@ from bot.formatting import (
     human_date,
     split_message,
 )
+from bot.i18n import Translator
 from bot.roster import load_roster
 from bot.storage import Note, Subscription
 from bot.timetable.models import Day, Event, Schedule
 
 TZ = ZoneInfo("Europe/Moscow")
+RU = Translator("ru")
+EN = Translator("en")
 ROSTER = load_roster()
 SETTINGS = Settings(
     bot_token="t",
@@ -59,11 +62,11 @@ def sample(days=None) -> Schedule:
 
 
 def test_human_date():
-    assert human_date(date(2026, 8, 31)) == "31 августа, понедельник"
+    assert human_date(date(2026, 8, 31), RU) == "31 августа, понедельник"
 
 
 def test_format_schedule_lists_details():
-    text = format_schedule(sample(), "Расписание на сегодня")
+    text = format_schedule(sample(), RU, "Расписание на сегодня")
     assert "Расписание на сегодня" in text
     assert "10:00–11:35" in text
     assert "Иванов И. И." in text
@@ -71,7 +74,7 @@ def test_format_schedule_lists_details():
 
 
 def test_empty_schedule_says_so():
-    text = format_schedule(sample(days=[Day(date=date(2026, 8, 31), title="", events=[])]))
+    text = format_schedule(sample(days=[Day(date=date(2026, 8, 31), title="", events=[])]), RU)
     assert "Занятий на этот период нет" in text
 
 
@@ -79,20 +82,20 @@ def test_canceled_event_is_marked():
     schedule = sample(
         days=[Day(date=date(2026, 8, 31), title="", events=[Event(subject="Пара", is_canceled=True)])]
     )
-    assert "отменено" in format_schedule(schedule)
+    assert "отменено" in format_schedule(schedule, RU)
 
 
 def test_html_is_escaped():
     schedule = sample(
         days=[Day(date=date(2026, 8, 31), title="", events=[Event(subject="<b>взлом</b>")])]
     )
-    assert "&lt;b&gt;взлом&lt;/b&gt;" in format_schedule(schedule)
+    assert "&lt;b&gt;взлом&lt;/b&gt;" in format_schedule(schedule, RU)
 
 
 def test_long_month_hides_empty_days():
     days = [Day(date=date(2026, 9, day), title="", events=[]) for day in range(1, 29)]
     days[0].events = [Event(subject="Лекция", time_text="10:00–11:35")]
-    text = format_schedule(sample(days=days))
+    text = format_schedule(sample(days=days), RU)
     assert text.count("занятий нет") == 0
     assert "Лекция" in text
 
@@ -109,9 +112,9 @@ def test_split_message_breaks_overlong_line():
 
 
 def test_digest_headers():
-    assert digest_header("daily", date(2026, 8, 31), date(2026, 8, 31)).startswith("Расписание на 31")
-    assert "неделю" in digest_header("weekly", date(2026, 8, 31), date(2026, 9, 6))
-    assert digest_header("monthly", date(2026, 9, 1), date(2026, 9, 30)) == "Расписание на сентябрь 2026"
+    assert digest_header("daily", date(2026, 8, 31), date(2026, 8, 31), RU).startswith("Расписание на 31")
+    assert "неделю" in digest_header("weekly", date(2026, 8, 31), date(2026, 9, 6), RU)
+    assert digest_header("monthly", date(2026, 9, 1), date(2026, 9, 30), RU) == "Расписание на сентябрь 2026"
 
 
 def test_format_subscription_shows_everything():
@@ -124,7 +127,7 @@ def test_format_subscription_shows_everything():
         send_minute=30,
         next_run_at=datetime(2026, 8, 31, 5, 30, tzinfo=timezone.utc),
     )
-    text = format_subscription(subscription, SETTINGS, ROSTER)
+    text = format_subscription(subscription, SETTINGS, ROSTER, RU)
     assert "Master in Management" in text
     assert "Shishlov Egor" in text
     assert "раз в день" in text
@@ -134,32 +137,38 @@ def test_format_subscription_shows_everything():
 
 
 def test_format_subscription_without_student():
-    text = format_subscription(Subscription(user_id=1, chat_id=1), SETTINGS, ROSTER)
+    text = format_subscription(Subscription(user_id=1, chat_id=1), SETTINGS, ROSTER, RU)
     assert "Фамилия не указана" in text
 
 
 def test_format_subscription_for_missing_student():
     subscription = Subscription(user_id=1, chat_id=1, student_name="Кто-то Выбывший")
-    assert "не найдены" in format_subscription(subscription, SETTINGS, ROSTER)
+    assert "не найдены" in format_subscription(subscription, SETTINGS, ROSTER, RU)
 
 
-def test_format_cohorts():
-    text = format_cohorts(ROSTER.get("Shishlov Egor"), ROSTER)
-    assert "Corporate Finance" in text and "Coh.2" in text
-    assert "MPS I" in text and "Shevchuk 2" in text
+def test_format_cohorts_is_localized():
+    student = ROSTER.get("Shishlov Egor")
+
+    russian = format_cohorts(student, ROSTER, RU)
+    assert "Корпоративные финансы" in russian and "Coh.2" in russian
+    assert "Профессиональные навыки менеджера I" in russian and "Shevchuk 2" in russian
+
+    english = format_cohorts(student, ROSTER, EN)
+    assert "Corporate Finance" in english
+    assert "Managerial and Professional Skills I" in english
 
 
 def test_schedule_footer_is_rendered():
-    text = format_schedule(sample(), "Заголовок", "Скрыто занятий других когорт: 2")
+    text = format_schedule(sample(), RU, "Заголовок", "Скрыто занятий других когорт: 2")
     assert "Скрыто занятий других когорт: 2" in text
 
 
 def test_format_notes():
     note = Note(id=7, user_id=1, chat_id=1, text="Сдать эссе",
                 due_at=datetime(2026, 9, 5, 6, 0, tzinfo=timezone.utc))
-    text = format_notes([note], TZ)
+    text = format_notes([note], TZ, RU)
     assert "#7" in text and "05.09.2026 09:00" in text and "Сдать эссе" in text
-    assert "нет запланированных" in format_notes([], TZ)
+    assert "нет запланированных" in format_notes([], TZ, RU)
 
 
 def test_now_local_uses_given_timezone():
