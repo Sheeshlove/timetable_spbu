@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.23
+# нужен только скрипту scripts/import_cohorts.py, боту в работе не требуется
+openpyxl>=3.1
