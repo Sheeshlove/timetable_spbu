@@ -91,6 +91,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "settings_title": "<b>Ваши настройки</b>",
         "settings_program": "🎓 Программа: {program}",
         "settings_language": "🌐 Язык: {language}",
+        "settings_course_language": "🗣 Иностранный язык: {course}",
         "settings_student": "👤 Вы: {name}",
         "settings_student_missing": (
             "👤 Вы: {name} (в текущем списке не найдены — обновите фамилию)"
@@ -104,6 +105,25 @@ TEXTS: dict[str, dict[str, str]] = {
         "cohorts_title": "<b>Ваши когорты</b>",
         "cohorts_empty": "Когорты для вас в списке не указаны.",
         "cohorts_unknown": "Фамилия не указана или вас нет в списке программы. Указать: /setup",
+        "ask_course_language": (
+            "Какой иностранный язык вы изучаете? Языковые пары идут параллельными "
+            "потоками, и я оставлю в расписании только ваш."
+        ),
+        "ask_course_teacher": (
+            "У этого языка несколько групп. Выберите своего преподавателя — "
+            "или «Любая группа», если пока не знаете."
+        ),
+        "course_language_saved": "Записал: <b>{course}</b>",
+        "course_language_none": "Хорошо, языковые пары показывать не буду.",
+        "course_language_all": "Хорошо, буду показывать все языковые пары.",
+        "hidden_language_note": "Скрыто чужих языковых пар: {count}.",
+        "btn_course_none": "Не изучаю",
+        "btn_course_all": "Показывать все",
+        "btn_any_teacher": "Любая группа",
+        "btn_settings_course_language": "🗣 Иностранный язык",
+        "course_language_unknown": (
+            "Не удалось получить список языков с сайта — вот обычный набор."
+        ),
         # --- расписание ---
         "loading": "Смотрю расписание…",
         "site_down": "Сайт расписания не отвечает 😕 Попробуйте позже.",
@@ -221,6 +241,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "settings_title": "<b>Your settings</b>",
         "settings_program": "🎓 Programme: {program}",
         "settings_language": "🌐 Language: {language}",
+        "settings_course_language": "🗣 Foreign language: {course}",
         "settings_student": "👤 You: {name}",
         "settings_student_missing": (
             "👤 You: {name} (not in the current roster — update your last name)"
@@ -234,6 +255,25 @@ TEXTS: dict[str, dict[str, str]] = {
         "cohorts_title": "<b>Your cohorts</b>",
         "cohorts_empty": "The roster lists no cohorts for you.",
         "cohorts_unknown": "No last name set, or you are not in the roster. Set it: /setup",
+        "ask_course_language": (
+            "Which foreign language do you study? Language classes run in parallel "
+            "streams, and I will keep only yours in the timetable."
+        ),
+        "ask_course_teacher": (
+            "This language has several groups. Pick your teacher — or «Any group» "
+            "if you do not know yet."
+        ),
+        "course_language_saved": "Saved: <b>{course}</b>",
+        "course_language_none": "Fine, I will not show language classes.",
+        "course_language_all": "Fine, I will show all language classes.",
+        "hidden_language_note": "Hidden language classes of other groups: {count}.",
+        "btn_course_none": "I don't study one",
+        "btn_course_all": "Show all of them",
+        "btn_any_teacher": "Any group",
+        "btn_settings_course_language": "🗣 Foreign language",
+        "course_language_unknown": (
+            "Could not fetch the language list from the site — here is the usual set."
+        ),
         "loading": "Fetching the timetable…",
         "site_down": "The timetable site is not responding 😕 Please try later.",
         "site_down_setup": (

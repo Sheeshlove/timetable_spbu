@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from html import escape
 
 from .i18n import Translator
+from .languages import choice_title
 from .roster import Roster, Student
 from .scheduling import DAILY, MONTHLY, OFF, WEEKLY
 from .storage import Note, Subscription
@@ -132,6 +133,19 @@ def format_subscription(
     else:
         lines.append(t("settings_no_student"))
 
+    if subscription.language_course:
+        lines.append(
+            t(
+                "settings_course_language",
+                course=escape(
+                    choice_title(
+                        subscription.language_course,
+                        subscription.language_teacher,
+                        t.lang,
+                    )
+                ),
+            )
+        )
     if student:
         lines.append(
             t("settings_filter_all") if subscription.show_all else t("settings_filter_mine")

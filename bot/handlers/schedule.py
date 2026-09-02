@@ -20,11 +20,13 @@ from ..formatting import (
     split_message,
 )
 from ..i18n import TEXTS, Translator
+from ..languages import filter_events
 from ..keyboards import frequency_keyboard, settings_keyboard, time_keyboard
 from ..roster import Roster
 from ..roster.filtering import filter_schedule
 from ..storage import Storage, Subscription
 from ..timetable import Schedule, TimetableClient, TimetableError
+from ..timetable.models import Day
 
 logger = logging.getLogger(__name__)
 router = Router(name="schedule")
@@ -38,17 +40,52 @@ def menu_button(key: str):
 def apply_cohorts(
     schedule: Schedule, subscription: Subscription, roster: Roster, t: Translator
 ) -> tuple[Schedule, str]:
-    """Оставляет занятия когорт студента и возвращает подпись под расписанием."""
-    if subscription.show_all or not subscription.student_name:
+    """Оставляет занятия студента: его когорты и его язык.
+
+    Возвращает отфильтрованное расписание и подпись под ним.
+    """
+    notes: list[str] = []
+    if subscription.show_all:
         return schedule, ""
-    student = roster.get(subscription.student_name)
-    if student is None:
-        logger.info("Студент %s не найден в списке", subscription.student_name)
-        return schedule, t("not_in_roster")
-    filtered, report = filter_schedule(schedule, student, roster)
-    if not report.hidden:
-        return filtered, ""
-    return filtered, t("hidden_note", count=report.hidden)
+
+    if subscription.student_name:
+        student = roster.get(subscription.student_name)
+        if student is None:
+            logger.info("Студент %s не найден в списке", subscription.student_name)
+            notes.append(t("not_in_roster"))
+        else:
+            schedule, report = filter_schedule(schedule, student, roster)
+            if report.hidden:
+                notes.append(t("hidden_note", count=report.hidden))
+
+    schedule, hidden_languages = _apply_language(schedule, subscription)
+    if hidden_languages:
+        notes.append(t("hidden_language_note", count=hidden_languages))
+
+    return schedule, " ".join(notes)
+
+
+def _apply_language(schedule: Schedule, subscription: Subscription) -> tuple[Schedule, int]:
+    """Убирает языковые пары чужих языков и групп."""
+    if not subscription.language_course:
+        return schedule, 0
+    days = []
+    hidden = 0
+    for day in schedule.days:
+        kept, count = filter_events(
+            day.events, subscription.language_course, subscription.language_teacher
+        )
+        hidden += count
+        days.append(Day(date=day.date, title=day.title, events=kept))
+    return (
+        Schedule(
+            group_id=schedule.group_id,
+            group_name=schedule.group_name,
+            days=days,
+            url=schedule.url,
+        ),
+        hidden,
+    )
 
 
 async def send_schedule(

@@ -285,7 +285,7 @@ cd /opt/timetable_spbu
 sudo -u timetable /opt/timetable_spbu/.venv/bin/python -m pytest -q
 ```
 
-Ожидается `192 passed`.
+Ожидается `223 passed`.
 
 ### Пробный запуск руками
 
@@ -345,9 +345,11 @@ systemctl disable --now timetable-bot   # выключить и убрать и�
 1. Откройте бота и отправьте `/start`.
 2. Выберите язык — русский или английский.
 3. Напишите свою фамилию — бот покажет найденного студента и его когорты.
-4. Нажмите «Это я», выберите периодичность и время рассылки.
-5. Отправьте `/today` — придёт расписание на сегодня, уже без чужих когорт.
-6. Отправьте любой текст, например `сдать эссе`, и выберите день — бот
+4. Нажмите «Это я» и укажите изучаемый иностранный язык.
+5. Выберите периодичность и время рассылки.
+6. Отправьте `/today` — придёт расписание на сегодня, без чужих когорт и
+   чужих языковых пар.
+7. Отправьте любой текст, например `сдать эссе`, и выберите день — бот
    подтвердит, что пришлёт заметку.
 
 Проверить, что рассылка запланирована, можно прямо в базе:
@@ -357,7 +359,8 @@ sudo -u timetable /opt/timetable_spbu/.venv/bin/python - <<'PY'
 import sqlite3
 conn = sqlite3.connect("/opt/timetable_spbu/data/bot.sqlite3")
 for row in conn.execute(
-    "SELECT user_id, student_name, lang, show_all, frequency, send_hour, next_run_at"
+    "SELECT user_id, student_name, lang, language_course, show_all, frequency,"
+    " send_hour, next_run_at"
     " FROM subscriptions"
 ):
     print(row)

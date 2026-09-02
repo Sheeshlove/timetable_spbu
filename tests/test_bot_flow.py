@@ -32,7 +32,7 @@ SETTINGS = Settings(
 
 
 class StubTimetable:
-    """Отвечает как сайт, но без сети."""
+    """Отвечает как сайт, но без сети: две когорты и параллельные языки."""
 
     def __init__(self) -> None:
         self.schedule_calls: list[tuple[int, date, date]] = []
@@ -58,6 +58,21 @@ class StubTimetable:
                             subject="Corporate Finance (Coh.2)",
                             time_text="12:00–13:35",
                             educators="Иванов И. И.",
+                        ),
+                        Event(
+                            subject="Электив. Иностранный язык (немецкий), семинар",
+                            time_text="09:00–10:30",
+                            educators="Нейман Ю. Е.",
+                        ),
+                        Event(
+                            subject="Электив. Иностранный язык (немецкий), семинар",
+                            time_text="09:00–10:30",
+                            educators="Павлова Н. Г.",
+                        ),
+                        Event(
+                            subject="Электив. Иностранный язык (французский), семинар",
+                            time_text="09:00–10:30",
+                            educators="Крикун Т. А.",
                         ),
                     ],
                 )
@@ -92,13 +107,23 @@ async def app(tmp_path: Path, dispatcher):
 
 CONFIRM = {"Русский": "Это я", "English": "That's me"}
 EVERY_DAY = {"Русский": "Раз в день", "English": "Every day"}
+SHOW_ALL_COURSES = {"Русский": "Показывать все", "English": "Show all of them"}
 
 
-async def complete_setup(telegram, surname: str = "Шишлов", language: str = "Русский") -> None:
+async def complete_setup(
+    telegram,
+    surname: str = "Шишлов",
+    language: str = "Русский",
+    course: str | None = None,
+) -> None:
+    """Проходит знакомство целиком. ``course`` — изучаемый язык, если нужен."""
     await telegram.send("/start")
     await telegram.click_button(language)
     await telegram.send(surname)
     await telegram.click_button(CONFIRM[language])
+    await telegram.click_button(course or SHOW_ALL_COURSES[language])
+    if course:  # у немецкого две группы — бот спросит преподавателя
+        await telegram.click_button("Любая группа" if language == "Русский" else "Any group")
     await telegram.click_button(EVERY_DAY[language])
     await telegram.click_button("08:00")
 
@@ -139,6 +164,8 @@ async def test_surname_lookup_shows_cohorts_and_saves(app):
     assert saved.student_name == "Shishlov Egor"
     assert saved.show_all is False
 
+    assert "иностранный язык" in telegram.session.texts[-1].lower()
+    await telegram.click_button("Показывать все")
     await telegram.click_button("Раз в день")
     await telegram.click_button("08:00")
     saved = await storage.get_subscription(777)
@@ -270,6 +297,7 @@ async def test_surname_can_be_changed_from_settings(app):
     await telegram.click_button("Сменить фамилию")
     await telegram.send("Юрченко")
     await telegram.click_button("Это я")
+    await telegram.click_button("Показывать все")
 
     saved = await storage.get_subscription(777)
     assert saved.student_name == "Iurchenko Kseniia"
@@ -399,6 +427,9 @@ async def test_english_setup_speaks_english(app):
     assert "Is this you?" in telegram.session.texts[-1]
 
     await telegram.click_button("That's me")
+    assert "foreign language" in telegram.session.texts[-1].lower()
+
+    await telegram.click_button("Show all of them")
     await telegram.click_button("Every day")
     assert "At what time" in telegram.session.texts[-1]
 
@@ -423,7 +454,7 @@ async def test_language_can_be_switched_later(app):
     assert (await storage.get_subscription(777)).lang == "ru"
 
     await telegram.send("/settings")
-    await telegram.click_button("Язык")
+    await telegram.click_button("Язык / Language")
     await telegram.click_button("English")
 
     saved = await storage.get_subscription(777)
@@ -473,3 +504,123 @@ async def test_menu_buttons_work_in_english(app):
 
     await telegram.send("⚙️ Settings")
     assert "Your settings" in telegram.session.texts[-1]
+
+
+# --- Изучаемый иностранный язык ---------------------------------------
+
+
+async def test_course_language_offers_what_is_in_the_schedule(app):
+    telegram, _, _ = app
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    await telegram.send("Шишлов")
+    await telegram.click_button("Это я")
+
+    labels = list(telegram.session.buttons())
+    assert "Немецкий" in labels and "Французский" in labels
+    assert "Испанский" not in labels, "в расписании испанского нет — и в списке нет"
+    assert "Показывать все" in labels and "Не изучаю" in labels
+
+
+async def test_course_language_asks_for_teacher_when_several_groups(app):
+    telegram, storage, _ = app
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    await telegram.send("Шишлов")
+    await telegram.click_button("Это я")
+
+    await telegram.click_button("Немецкий")
+    assert "несколько групп" in telegram.session.texts[-1]
+    assert "Нейман Ю. Е." in telegram.session.buttons()
+
+    await telegram.click_button("Нейман")
+    saved = await storage.get_subscription(777)
+    assert saved.language_course == "de"
+    assert saved.language_teacher == "Нейман Ю. Е."
+
+
+async def test_single_group_language_skips_the_teacher_step(app):
+    telegram, storage, _ = app
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    await telegram.send("Шишлов")
+    await telegram.click_button("Это я")
+
+    await telegram.click_button("Французский")
+    # у французского в этом расписании один преподаватель — сразу периодичность
+    assert "Как часто" in telegram.session.texts[-1]
+    saved = await storage.get_subscription(777)
+    assert saved.language_course == "fr"
+    assert saved.language_teacher == ""
+
+
+async def test_schedule_hides_other_languages(app):
+    telegram, storage, _ = app
+    await complete_setup(telegram, course="Немецкий")
+    assert (await storage.get_subscription(777)).language_course == "de"
+
+    telegram.session.clear()
+    await telegram.send("/today")
+    text = telegram.session.texts[-1]
+    assert "немецкий" in text
+    assert "французский" not in text
+    assert "Скрыто чужих языковых пар: 1" in text
+
+
+async def test_not_studying_a_language_hides_them_all(app):
+    telegram, storage, _ = app
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    await telegram.send("Шишлов")
+    await telegram.click_button("Это я")
+    await telegram.click_button("Не изучаю")
+    await telegram.click_button("Раз в день")
+    await telegram.click_button("08:00")
+
+    assert (await storage.get_subscription(777)).language_course == "none"
+
+    telegram.session.clear()
+    await telegram.send("/today")
+    text = telegram.session.texts[-1]
+    assert "язык" not in text.lower().replace("языковых", "")
+    assert "Скрыто чужих языковых пар: 3" in text
+
+
+async def test_course_language_can_be_changed_from_settings(app):
+    telegram, storage, _ = app
+    await complete_setup(telegram, course="Немецкий")
+
+    await telegram.send("/settings")
+    await telegram.click_button("Иностранный язык")
+    await telegram.click_button("Французский")
+
+    saved = await storage.get_subscription(777)
+    assert saved.language_course == "fr"
+    assert saved.language_teacher == "", "у нового языка группа сбрасывается"
+    assert saved.frequency == DAILY, "смена языка не трогает рассылку"
+    assert saved.student_name == "Shishlov Egor"
+
+
+async def test_settings_card_shows_the_course_language(app):
+    telegram, _, _ = app
+    await complete_setup(telegram, course="Немецкий")
+    telegram.session.clear()
+
+    await telegram.send("/settings")
+    assert "Иностранный язык: Немецкий" in telegram.session.texts[-1]
+
+
+async def test_settings_card_shows_the_chosen_group(app):
+    telegram, _, _ = app
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    await telegram.send("Шишлов")
+    await telegram.click_button("Это я")
+    await telegram.click_button("Немецкий")
+    await telegram.click_button("Нейман")
+    await telegram.click_button("Раз в день")
+    await telegram.click_button("08:00")
+    telegram.session.clear()
+
+    await telegram.send("/settings")
+    assert "Иностранный язык: Немецкий · Нейман Ю. Е." in telegram.session.texts[-1]

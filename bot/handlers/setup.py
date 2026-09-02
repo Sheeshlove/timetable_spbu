@@ -11,20 +11,33 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
+from datetime import timedelta
+
 from ..config import Settings
-from ..formatting import format_cohorts, format_subscription, frequency_title
+from ..formatting import format_cohorts, format_subscription, frequency_title, now_local
 from ..i18n import Translator, menu_texts
 from ..keyboards import (
     confirm_student_keyboard,
+    course_language_keyboard,
+    course_teacher_keyboard,
     frequency_keyboard,
     language_keyboard,
     main_menu,
     students_keyboard,
     time_keyboard,
 )
+from ..languages import (
+    ANY as COURSE_ANY,
+    FALLBACK_KEYS,
+    NONE as COURSE_NONE,
+    language_name,
+    languages_in_schedule,
+    teachers_for,
+)
 from ..roster import Roster, Student
 from ..scheduling import OFF, next_run_at
 from ..storage import Storage, Subscription
+from ..timetable import TimetableClient, TimetableError
 
 logger = logging.getLogger(__name__)
 router = Router(name="setup")
@@ -33,6 +46,8 @@ router = Router(name="setup")
 class SetupStates(StatesGroup):
     language = State()
     last_name = State()
+    course_language = State()
+    course_teacher = State()
     frequency = State()
     send_time = State()
 
@@ -167,6 +182,7 @@ async def on_student_picked(
     state: FSMContext,
     storage: Storage,
     settings: Settings,
+    client: TimetableClient,
     roster: Roster,
     t: Translator,
 ) -> None:
@@ -178,7 +194,9 @@ async def on_student_picked(
         return
 
     if choice == "none":
-        await _remember_student(callback, state, storage, roster, t, student=None)
+        await _remember_student(
+            callback, state, storage, settings, client, roster, t, student=None
+        )
         return
 
     data = await state.get_data()
@@ -194,13 +212,17 @@ async def on_student_picked(
         await callback.message.answer(t("record_not_found"))
         await ask_last_name(callback.message, state, t)
         return
-    await _remember_student(callback, state, storage, roster, t, student=student)
+    await _remember_student(
+        callback, state, storage, settings, client, roster, t, student=student
+    )
 
 
 async def _remember_student(
     callback: CallbackQuery,
     state: FSMContext,
     storage: Storage,
+    settings: Settings,
+    client: TimetableClient,
     roster: Roster,
     t: Translator,
     *,
@@ -226,7 +248,179 @@ async def _remember_student(
             + format_cohorts(student, roster, t)
         )
 
-    await ask_frequency(callback.message, state, subscription, t)
+    await ask_course_language(callback.message, state, settings, client, t)
+
+
+# --- Изучаемый иностранный язык ---------------------------------------
+
+
+async def _upcoming_week(settings: Settings, client: TimetableClient, lang: str):
+    """Неделя вперёд — по ней узнаём, какие языки и группы вообще бывают."""
+    today = now_local(settings.tz).date()
+    monday = today - timedelta(days=today.weekday())
+    return await client.schedule(
+        settings.group_id, monday, monday + timedelta(days=13), settings.division_alias, lang
+    )
+
+
+async def ask_course_language(
+    message: Message,
+    state: FSMContext,
+    settings: Settings,
+    client: TimetableClient,
+    t: Translator,
+) -> None:
+    """Спрашивает язык, предлагая то, что реально стоит в расписании."""
+    await state.set_state(SetupStates.course_language)
+    keys: list[str] = []
+    note = ""
+    try:
+        schedule = await _upcoming_week(settings, client, t.lang)
+        keys = languages_in_schedule(schedule)
+    except TimetableError as error:
+        logger.info("Список языков с сайта не получен: %s", error)
+    if not keys:
+        keys = list(FALLBACK_KEYS)
+        note = "\n\n" + t("course_language_unknown")
+
+    await message.answer(
+        t("ask_course_language") + note, reply_markup=course_language_keyboard(keys, t)
+    )
+
+
+@router.callback_query(F.data.startswith("course:"))
+async def on_course_language(
+    callback: CallbackQuery,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    client: TimetableClient,
+    roster: Roster,
+    t: Translator,
+) -> None:
+    choice = callback.data.split(":", 1)[1]
+    await callback.answer()
+
+    subscription = await storage.get_subscription(callback.from_user.id)
+    if subscription is None:
+        await callback.message.answer(t("not_configured"))
+        return
+
+    if choice == "all":
+        subscription.language_course = COURSE_ANY
+        subscription.language_teacher = ""
+        await storage.save_subscription(subscription)
+        await callback.message.answer(t("course_language_all"))
+        await _after_course(
+            callback.message, state, storage, settings, roster, t, callback.from_user.id
+        )
+        return
+
+    if choice == COURSE_NONE:
+        subscription.language_course = COURSE_NONE
+        subscription.language_teacher = ""
+        await storage.save_subscription(subscription)
+        await callback.message.answer(t("course_language_none"))
+        await _after_course(
+            callback.message, state, storage, settings, roster, t, callback.from_user.id
+        )
+        return
+
+    subscription.language_course = choice
+    subscription.language_teacher = ""
+    await storage.save_subscription(subscription)
+
+    teachers: list[str] = []
+    try:
+        schedule = await _upcoming_week(settings, client, t.lang)
+        teachers = teachers_for(schedule, choice)
+    except TimetableError as error:
+        logger.info("Преподаватели языка с сайта не получены: %s", error)
+
+    if len(teachers) > 1:  # у языка несколько групп — уточняем
+        await state.update_data(course_teachers=teachers)
+        await state.set_state(SetupStates.course_teacher)
+        await callback.message.answer(
+            t("ask_course_teacher"), reply_markup=course_teacher_keyboard(teachers, t)
+        )
+        return
+
+    await callback.message.answer(
+        t("course_language_saved", course=escape(language_name(choice, t.lang)))
+    )
+    await _after_course(
+            callback.message, state, storage, settings, roster, t, callback.from_user.id
+        )
+
+
+@router.callback_query(F.data.startswith("teacher:"))
+async def on_course_teacher(
+    callback: CallbackQuery,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    roster: Roster,
+    t: Translator,
+) -> None:
+    choice = callback.data.split(":", 1)[1]
+    await callback.answer()
+
+    subscription = await storage.get_subscription(callback.from_user.id)
+    if subscription is None:
+        await callback.message.answer(t("not_configured"))
+        return
+
+    teacher = ""
+    if choice != "any":
+        teachers = (await state.get_data()).get("course_teachers", [])
+        index = int(choice)
+        if index < len(teachers):
+            teacher = teachers[index]
+
+    subscription.language_teacher = teacher
+    await storage.save_subscription(subscription)
+
+    title = language_name(subscription.language_course, t.lang)
+    if teacher:
+        title = f"{title} · {teacher}"
+    await callback.message.answer(t("course_language_saved", course=escape(title)))
+    await _after_course(
+            callback.message, state, storage, settings, roster, t, callback.from_user.id
+        )
+
+
+async def _after_course(
+    message: Message,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    roster: Roster,
+    t: Translator,
+    user_id: int,
+) -> None:
+    """После языка: либо продолжаем знакомство, либо показываем карточку."""
+    subscription = await storage.get_subscription(user_id)
+    data = await state.get_data()
+    if data.get("editing_course"):
+        await state.clear()
+        if subscription is not None:
+            await message.answer(format_subscription(subscription, settings, roster, t))
+        return
+    await ask_frequency(message, state, subscription, t)
+
+
+@router.callback_query(F.data == "settings:course")
+async def change_course_language(
+    callback: CallbackQuery,
+    state: FSMContext,
+    settings: Settings,
+    client: TimetableClient,
+    t: Translator,
+) -> None:
+    await callback.answer()
+    await state.clear()
+    await state.update_data(editing_course=True)
+    await ask_course_language(callback.message, state, settings, client, t)
 
 
 # --- Периодичность и время --------------------------------------------

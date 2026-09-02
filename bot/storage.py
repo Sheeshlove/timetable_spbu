@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     chat_id      INTEGER NOT NULL,
     student_name TEXT    NOT NULL DEFAULT '',
     lang         TEXT    NOT NULL DEFAULT 'ru',
+    language_course  TEXT NOT NULL DEFAULT '',
+    language_teacher TEXT NOT NULL DEFAULT '',
     show_all     INTEGER NOT NULL DEFAULT 0,
     frequency    TEXT    NOT NULL DEFAULT 'off',
     send_hour    INTEGER NOT NULL DEFAULT 8,
@@ -37,6 +39,14 @@ CREATE TABLE IF NOT EXISTS notes (
 CREATE INDEX IF NOT EXISTS idx_notes_due ON notes (status, due_at);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_next_run ON subscriptions (next_run_at);
 """
+
+# Колонки, добавленные после первой версии новой схемы: их дописываем
+# в существующую таблицу через ALTER TABLE.
+LATER_COLUMNS = {
+    "lang": "lang TEXT NOT NULL DEFAULT 'ru'",
+    "language_course": "language_course TEXT NOT NULL DEFAULT ''",
+    "language_teacher": "language_teacher TEXT NOT NULL DEFAULT ''",
+}
 
 
 def utcnow() -> datetime:
@@ -64,6 +74,9 @@ class Subscription:
     chat_id: int
     student_name: str = ""
     lang: str = "ru"
+    # Изучаемый иностранный язык и, если групп несколько, преподаватель
+    language_course: str = ""
+    language_teacher: str = ""
     show_all: bool = False
     frequency: str = "off"
     send_hour: int = 8
@@ -77,6 +90,8 @@ class Subscription:
             chat_id=row["chat_id"],
             student_name=row["student_name"],
             lang=row["lang"],
+            language_course=row["language_course"],
+            language_teacher=row["language_teacher"],
             show_all=bool(row["show_all"]),
             frequency=row["frequency"],
             send_hour=row["send_hour"],
@@ -137,11 +152,10 @@ class Storage:
 
         if "student_name" in columns:
             # Схема уже новая: добавляем колонки, появившиеся позже.
-            if "lang" not in columns:
-                await self._db.execute(
-                    "ALTER TABLE subscriptions ADD COLUMN lang TEXT NOT NULL DEFAULT 'ru'"
-                )
-                await self._db.commit()
+            for column, ddl in LATER_COLUMNS.items():
+                if column not in columns:
+                    await self._db.execute(f"ALTER TABLE subscriptions ADD COLUMN {ddl}")
+            await self._db.commit()
             return
 
         await self._db.executescript(
@@ -187,14 +201,17 @@ class Storage:
         await self.db.execute(
             """
             INSERT INTO subscriptions (
-                user_id, chat_id, student_name, lang, show_all, frequency,
-                send_hour, send_minute, next_run_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                user_id, chat_id, student_name, lang, language_course, language_teacher,
+                show_all, frequency, send_hour, send_minute, next_run_at,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
-                chat_id      = excluded.chat_id,
-                student_name = excluded.student_name,
-                lang         = excluded.lang,
-                show_all     = excluded.show_all,
+                chat_id          = excluded.chat_id,
+                student_name     = excluded.student_name,
+                lang             = excluded.lang,
+                language_course  = excluded.language_course,
+                language_teacher = excluded.language_teacher,
+                show_all         = excluded.show_all,
                 frequency    = excluded.frequency,
                 send_hour    = excluded.send_hour,
                 send_minute  = excluded.send_minute,
@@ -206,6 +223,8 @@ class Storage:
                 subscription.chat_id,
                 subscription.student_name,
                 subscription.lang,
+                subscription.language_course,
+                subscription.language_teacher,
                 int(subscription.show_all),
                 subscription.frequency,
                 subscription.send_hour,
