@@ -8,6 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.__main__ import build_dispatcher
 from bot.config import Settings
+from bot.formatting import now_local
 from bot.roster import load_roster
 from bot.scheduling import DAILY, WEEKLY
 from bot.storage import Storage
@@ -179,7 +180,9 @@ async def test_today_filters_foreign_cohort(app):
     telegram.session.clear()
 
     await telegram.send("/today")
-    today = date.today()
+    # Дату считаем в часовом поясе рассылки, а не сервера: ночью по Москве
+    # это разные дни, и «сегодня» для студента — московское.
+    today = now_local(SETTINGS.tz).date()
     assert timetable.schedule_calls[-1] == (474489, today, today)
 
     text = telegram.session.texts[-1]
@@ -291,8 +294,11 @@ async def test_note_via_buttons(app):
     notes = await storage.pending_notes(777)
     assert len(notes) == 1
     assert notes[0].text == "Сдать эссе по стратегии"
-    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).date()
-    assert notes[0].due_at.date() in {tomorrow, tomorrow - timedelta(days=1)}
+
+    due_local = notes[0].due_at.astimezone(SETTINGS.tz)
+    assert due_local.date() == now_local(SETTINGS.tz).date() + timedelta(days=1)
+    assert due_local.hour == 8, "заметка приходит в то же время, что и расписание"
+
 
 
 async def test_note_one_liner(app):
