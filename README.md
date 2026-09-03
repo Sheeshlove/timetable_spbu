@@ -69,7 +69,7 @@ QMBR, семинары — Coh.4
 git clone https://github.com/sheeshlove/timetable_spbu.git
 cd timetable_spbu
 
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env         # и вписать BOT_TOKEN от @BotFather
