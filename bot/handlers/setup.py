@@ -31,7 +31,7 @@ from ..languages import (
     FALLBACK_KEYS,
     NONE as COURSE_NONE,
     language_name,
-    languages_in_schedule,
+    offered_languages,
     teachers_for,
 )
 from ..roster import Roster, Student
@@ -254,12 +254,22 @@ async def _remember_student(
 # --- Изучаемый иностранный язык ---------------------------------------
 
 
+# Сколько недель расписания смотреть, чтобы узнать языки и их группы. Месяц
+# берётся не из осторожности: языковые пары могут начаться не с первой недели,
+# а язык студент выбирает один раз.
+LOOKAHEAD_DAYS = 27
+
+
 async def _upcoming_week(settings: Settings, client: TimetableClient, lang: str):
-    """Неделя вперёд — по ней узнаём, какие языки и группы вообще бывают."""
+    """Ближайший месяц — по нему узнаём, какие языки и группы вообще бывают."""
     today = now_local(settings.tz).date()
     monday = today - timedelta(days=today.weekday())
     return await client.schedule(
-        settings.group_id, monday, monday + timedelta(days=13), settings.division_alias, lang
+        settings.group_id,
+        monday,
+        monday + timedelta(days=LOOKAHEAD_DAYS),
+        settings.division_alias,
+        lang,
     )
 
 
@@ -272,14 +282,12 @@ async def ask_course_language(
 ) -> None:
     """Спрашивает язык, предлагая то, что реально стоит в расписании."""
     await state.set_state(SetupStates.course_language)
-    keys: list[str] = []
     note = ""
     try:
         schedule = await _upcoming_week(settings, client, t.lang)
-        keys = languages_in_schedule(schedule)
+        keys = offered_languages(schedule)
     except TimetableError as error:
         logger.info("Список языков с сайта не получен: %s", error)
-    if not keys:
         keys = list(FALLBACK_KEYS)
         note = "\n\n" + t("course_language_unknown")
 

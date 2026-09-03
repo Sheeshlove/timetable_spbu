@@ -5,9 +5,10 @@
 языков по две группы с разными преподавателями. Студенту нужна одна пара из
 шести, поэтому бот спрашивает язык, а при необходимости и преподавателя.
 
-Занятие считается языковым, если в названии есть слово «язык» (или
-«language»), — так «Иностранный язык (немецкий)» и «Русский язык как
-иностранный» распознаются, а «Количественные методы» нет.
+Занятие считается языковым, только если в названии есть и слово «язык» (или
+«language»), и название конкретного языка. Одного слова «язык» мало: иначе
+«Языки программирования» попадут под фильтр и пропадут у тех, кто выбрал
+«не изучаю».
 """
 
 from __future__ import annotations
@@ -57,8 +58,13 @@ LANGUAGES: tuple[Language, ...] = (
 
 BY_KEY = {language.key: language for language in LANGUAGES}
 
-# Что показать, если сходить на сайт за списком языков не удалось.
-FALLBACK_KEYS = ("en", "de", "fr", "es", "ru_foreign")
+# Языки, которые в ВШМ преподают постоянно. Их показываем всегда, даже если в
+# ближайших неделях расписания их не оказалось: пары могут начаться позже, а
+# студент выбирает язык один раз.
+COMMON_KEYS = ("en", "de", "fr", "es", "it", "zh", "ru_foreign")
+
+# Что показать, если сходить на сайт за расписанием вовсе не удалось.
+FALLBACK_KEYS = COMMON_KEYS
 
 
 def language_name(key: str, lang: str = "ru") -> str:
@@ -66,20 +72,25 @@ def language_name(key: str, lang: str = "ru") -> str:
     return found.name(lang) if found else key
 
 
-def is_language_class(event: Event) -> bool:
-    """Языковое ли это занятие."""
-    return bool(LANGUAGE_CLASS_RE.search(event.subject))
-
-
 def detect_language(event: Event) -> str | None:
-    """Какой язык преподаётся на занятии. None — не языковое или непонятно."""
-    if not is_language_class(event):
+    """Какой язык преподаётся на занятии. None — занятие не языковое.
+
+    Нужны оба признака: слово «язык» и название языка. «Языки
+    программирования» первому условию удовлетворяют, второму — нет, и под
+    языковой фильтр не попадают.
+    """
+    if not LANGUAGE_CLASS_RE.search(event.subject):
         return None
     subject = event.subject.lower()
     for language in LANGUAGES:
         if any(needle in subject for needle in language.match):
             return language.key
     return None
+
+
+def is_language_class(event: Event) -> bool:
+    """Языковое ли это занятие — то есть узнали ли мы язык."""
+    return detect_language(event) is not None
 
 
 def languages_in_schedule(schedule: Schedule) -> list[str]:
@@ -91,6 +102,19 @@ def languages_in_schedule(schedule: Schedule) -> list[str]:
         if (key := detect_language(event)) is not None
     }
     return [language.key for language in LANGUAGES if language.key in found]
+
+
+def offered_languages(schedule: Schedule | None) -> list[str]:
+    """Что предложить студенту на выбор.
+
+    Сначала языки, которые действительно стоят в ближайшем расписании, —
+    их студент увидит первыми. Дальше остальные обычные языки программы:
+    пары могут начаться позже в семестре, а язык выбирается один раз, и
+    пропавший из списка английский хуже лишней кнопки.
+    """
+    found = languages_in_schedule(schedule) if schedule is not None else []
+    rest = [key for key in COMMON_KEYS if key not in found]
+    return found + rest
 
 
 def teachers_for(schedule: Schedule, key: str) -> list[str]:
@@ -125,7 +149,7 @@ def belongs_to_student(event: Event, choice: str, teacher: str = ANY_TEACHER) ->
     Осторожность та же, что и с когортами: скрываем только то, про что точно
     известно, что это чужой язык или чужая группа.
     """
-    if not is_language_class(event):
+    if detect_language(event) is None:
         return True
     if choice == ANY:
         return True
@@ -133,7 +157,7 @@ def belongs_to_student(event: Event, choice: str, teacher: str = ANY_TEACHER) ->
         return False
 
     detected = detect_language(event)
-    if detected is None:  # языковое занятие без понятного языка — оставляем
+    if detected is None:  # не языковое занятие — не наше дело
         return True
     if detected != choice:
         return False

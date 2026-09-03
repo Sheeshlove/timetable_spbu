@@ -6,6 +6,7 @@ from bot.languages import (
     ANY,
     FALLBACK_KEYS,
     NONE,
+    offered_languages,
     belongs_to_student,
     choice_title,
     detect_language,
@@ -61,11 +62,28 @@ def test_regular_subjects_are_not_language_classes(subject):
 
 
 def test_unknown_language_is_not_guessed():
-    """Языковая пара непонятного языка остаётся — скрывать её нельзя."""
+    """Пара на языке, которого нет в каталоге, под фильтр не попадает."""
     unknown = event("Иностранный язык (суахили), семинар")
-    assert is_language_class(unknown) is True
     assert detect_language(unknown) is None
+    assert is_language_class(unknown) is False
     assert belongs_to_student(unknown, "de") is True
+    assert belongs_to_student(unknown, NONE) is True
+
+
+@pytest.mark.parametrize(
+    "subject",
+    [
+        "Языки программирования, лекция",
+        "Факультатив. Языки разметки и обработки данных",
+        "Формальные языки и автоматы",
+    ],
+)
+def test_programming_languages_are_not_language_classes(subject):
+    """Слова «язык» мало: иначе такие курсы пропадут у «не изучаю языки»."""
+    lesson = event(subject)
+    assert is_language_class(lesson) is False
+    assert belongs_to_student(lesson, NONE) is True
+    assert belongs_to_student(lesson, "de") is True
 
 
 # --- что предлагать студенту -------------------------------------------
@@ -82,8 +100,24 @@ def test_teachers_of_a_language():
 
 
 def test_fallback_list_is_meaningful():
-    assert set(FALLBACK_KEYS) >= {"de", "fr", "es"}
+    assert set(FALLBACK_KEYS) >= {"en", "de", "fr", "es"}
     assert all(language_name(key) for key in FALLBACK_KEYS)
+
+
+def test_offered_list_starts_with_what_is_in_the_schedule():
+    offered = offered_languages(WEEK)
+    assert offered[: len(languages_in_schedule(WEEK))] == languages_in_schedule(WEEK)
+
+
+def test_offered_list_keeps_common_languages():
+    """Английского в этой неделе нет, но выбрать его студент должен уметь."""
+    offered = offered_languages(WEEK)
+    assert "en" in offered
+    assert len(offered) == len(set(offered)), "без повторов"
+
+
+def test_offered_list_without_schedule():
+    assert offered_languages(None) == list(FALLBACK_KEYS)
 
 
 # --- отбор -------------------------------------------------------------

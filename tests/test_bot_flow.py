@@ -517,8 +517,10 @@ async def test_course_language_offers_what_is_in_the_schedule(app):
     await telegram.click_button("Это я")
 
     labels = list(telegram.session.buttons())
-    assert "Немецкий" in labels and "Французский" in labels
-    assert "Испанский" not in labels, "в расписании испанского нет — и в списке нет"
+    # то, что стоит в расписании, идёт первым
+    assert labels[:2] == ["Немецкий", "Французский"]
+    # английского в этой неделе нет, но выбрать его всё равно можно
+    assert "Английский" in labels
     assert "Показывать все" in labels and "Не изучаю" in labels
 
 
