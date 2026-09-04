@@ -7,7 +7,9 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramNetworkError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
@@ -36,6 +38,52 @@ COMMANDS = [
     BotCommand(command="setup", description="Заново указать фамилию"),
     BotCommand(command="stop", description="Отключить рассылку"),
 ]
+
+
+def hide_credentials(url: str) -> str:
+    """Прячет логин и пароль прокси: адрес попадает в журнал."""
+    if "@" not in url:
+        return url
+    scheme, _, rest = url.rpartition("://")
+    return f"{scheme}://***@{rest.rpartition('@')[2]}" if scheme else f"***@{rest.rpartition('@')[2]}"
+
+
+def build_bot(settings: Settings) -> Bot:
+    """Бот, при необходимости — через прокси.
+
+    С части хостингов (в том числе российских) `api.telegram.org` недоступен
+    напрямую: запросы просто виснут до таймаута. На такой случай есть
+    `TELEGRAM_PROXY` — адрес вида `socks5://user:pass@host:1080` или
+    `http://host:3128`.
+    """
+    session = None
+    if settings.telegram_proxy:
+        try:
+            session = AiohttpSession(proxy=settings.telegram_proxy)
+        except RuntimeError as error:  # нет aiohttp-socks
+            raise SystemExit(
+                "TELEGRAM_PROXY задан, но не установлен пакет aiohttp-socks.\n"
+                "Выполните: .venv/bin/pip install -r requirements.txt"
+            ) from error
+        logger.info("Telegram — через прокси %s", hide_credentials(settings.telegram_proxy))
+    return Bot(
+        token=settings.bot_token,
+        session=session,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+
+
+async def announce_commands(bot: Bot) -> None:
+    """Меню команд в Telegram.
+
+    Это украшение, а не условие работы: если сеть до Telegram сейчас не
+    отвечает, бот всё равно должен подняться — polling переживает обрывы сам
+    и подхватит связь, когда она вернётся.
+    """
+    try:
+        await bot.set_my_commands(COMMANDS)
+    except TelegramNetworkError as error:
+        logger.warning("Меню команд не обновилось, продолжаю без него: %s", error)
 
 
 def build_dispatcher(
@@ -69,15 +117,12 @@ async def run() -> None:
     client = TimetableClient(
         settings.base_url, timeout=settings.http_timeout, cache_ttl=settings.http_cache_ttl
     )
-    bot = Bot(
-        token=settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
+    bot = build_bot(settings)
     roster = load_roster(settings.roster_path) if settings.roster_path else load_roster()
     dispatcher = build_dispatcher(storage, client, settings, roster)
     scheduler = Scheduler(bot, storage, client, settings, roster)
 
-    await bot.set_my_commands(COMMANDS)
+    await announce_commands(bot)
     scheduler.start()
     logger.info(
         "Бот запущен: программа «%s», группа %s, студентов в списке %s, пояс %s",

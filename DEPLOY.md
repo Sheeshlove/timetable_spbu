@@ -216,6 +216,7 @@ LOG_LEVEL=INFO
 | `DIVISION_ALIAS` | Псевдоним подразделения в адресах сайта |
 | `PROGRAM_TITLE` | Как программа называется в сообщениях бота |
 | `ROSTER_PATH` | Путь к списку студентов, если храните его вне репозитория |
+| `TELEGRAM_PROXY` | Прокси до Telegram; нужен, только если он с сервера не открывается |
 | `DB_PATH` | Файл базы SQLite. Относительный путь считается от каталога приложения |
 | `TZ_NAME` | Часовой пояс, в котором пользователь выбирает время рассылки |
 | `TIMETABLE_BASE_URL` | Адрес сайта расписания |
@@ -275,11 +276,84 @@ sudo -u timetable /opt/timetable_spbu/.venv/bin/python \
 ### Доступность Telegram
 
 ```bash
-curl -s "https://api.telegram.org/bot$(grep -oP '(?<=^BOT_TOKEN=).*' /opt/timetable_spbu/.env)/getMe"
+cd /opt/timetable_spbu
+sudo -u timetable /opt/timetable_spbu/.venv/bin/python scripts/check_telegram.py --tries 10
 ```
 
-Ответ должен быть с `"ok":true` и именем вашего бота. `"ok":false` —
-проверьте токен; таймаут — исходящий доступ к Telegram закрыт.
+Скрипт резолвит `api.telegram.org`, делает десять запросов подряд и говорит,
+сколько прошло:
+
+```
+✅ DNS IPv4: 149.154.167.220
+Прокси: нет, напрямую
+✅ попытка 1: @mimobotik_bot, 0.21 с
+...
+Удачных: 10 из 10
+```
+
+Одной проверки мало: фильтрация трафика часто пропускает первый запрос и
+режет следующие, поэтому важно, чтобы прошли **все** попытки. Токен скрипт
+берёт из `.env` и нигде не печатает.
+
+Что означает результат:
+
+| Вывод | Причина | Что делать |
+| --- | --- | --- |
+| Все попытки удачны | Связь есть | Идти дальше |
+| `Telegram ответил отказом (401)` | Неверный токен | Сверить с @BotFather |
+| Таймаут во всех попытках | Telegram недоступен с сервера | См. [«Telegram недоступен с сервера»](#telegram-недоступен-с-сервера) |
+| Часть попыток проходит | Трафик фильтруется | Там же |
+| `ответ не от Telegram` | Отвечает не Telegram, а фильтр по дороге | Там же |
+
+### Telegram недоступен с сервера
+
+Симптом в логе — бот не стартует или перезапускается по кругу:
+
+```
+aiogram.exceptions.TelegramNetworkError: HTTP Client says - Request timeout error
+```
+
+Это не ошибка бота и не проблема с токеном: с сервера просто не открывается
+соединение к `api.telegram.org`. Так себя ведут многие хостинги в России —
+Telegram у них блокируется или режется по DPI, причём непостоянно: первый
+запрос проходит, остальные виснут.
+
+Проверьте, что дело именно в Telegram, а не в сети вообще:
+
+```bash
+curl -sI https://timetable.spbu.ru | head -1      # сайт расписания открывается?
+curl -sI https://api.telegram.org | head -1       # а Telegram?
+```
+
+Если расписание открывается, а Telegram нет — нужен прокси. Подойдёт любой
+SOCKS5 или HTTP-прокси вне зоны блокировки (свой сервер за границей, VPS с
+`danted`, платный сервис). Проверьте его тем же скриптом:
+
+```bash
+sudo -u timetable /opt/timetable_spbu/.venv/bin/python \
+    scripts/check_telegram.py --tries 10 --proxy socks5://логин:пароль@адрес:1080
+```
+
+Если через прокси десять из десяти — пропишите его в `.env`:
+
+```ini
+TELEGRAM_PROXY=socks5://логин:пароль@адрес:1080
+```
+
+и перезапустите бота:
+
+```bash
+systemctl restart timetable-bot
+journalctl -u timetable-bot -n 20 --no-pager
+```
+
+В логе появится строка `Telegram — через прокси socks5://***@адрес:1080`
+(пароль в журнал не попадает). Через прокси ходит только Telegram; за
+расписанием бот по-прежнему обращается напрямую, так что российский сервер
+здесь даже удобнее — `timetable.spbu.ru` с него открывается быстрее.
+
+Альтернатива прокси — перенести бота на сервер вне зоны блокировки. Тогда
+имеет смысл проверить, открывается ли оттуда `timetable.spbu.ru`.
 
 ### Тесты (по желанию)
 
@@ -289,7 +363,7 @@ cd /opt/timetable_spbu
 sudo -u timetable /opt/timetable_spbu/.venv/bin/python -m pytest -q
 ```
 
-Ожидается `263 passed`.
+Ожидается `269 passed`.
 
 ### Пробный запуск руками
 
@@ -550,6 +624,7 @@ journalctl -u timetable-bot -n 100 --no-pager
 | Симптом в логе | Причина | Что делать |
 | --- | --- | --- |
 | `Не задан BOT_TOKEN` | Сервис не видит `.env` | Проверьте `EnvironmentFile` в юните и что файл существует: `ls -l /opt/timetable_spbu/.env` |
+| `TelegramNetworkError: Request timeout error` | С сервера не открывается `api.telegram.org` | См. [«Telegram недоступен с сервера»](#telegram-недоступен-с-сервера): проверьте `scripts/check_telegram.py`, при блокировке пропишите `TELEGRAM_PROXY` |
 | `TelegramUnauthorizedError` | Неверный или отозванный токен | Сверьте токен с @BotFather, поправьте `.env`, `systemctl restart timetable-bot` |
 | `TelegramConflictError: terminated by other getUpdates` | Запущено две копии бота с одним токеном | Оставьте одну: `systemctl stop timetable-bot` на лишнем сервере, проверьте `docker ps` |
 | `Сайт расписания не отвечает` у пользователей | `timetable.spbu.ru` недоступен с сервера | `curl -sI https://timetable.spbu.ru` — если не отвечает, проблема в сети сервера, а не в боте |
@@ -568,6 +643,8 @@ journalctl -u timetable-bot -n 100 --no-pager
 ```bash
 curl -sI https://api.telegram.org | head -1     # ожидается HTTP/2 200 или 302
 curl -sI https://timetable.spbu.ru | head -1    # ожидается HTTP/2 200
+sudo -u timetable /opt/timetable_spbu/.venv/bin/python \
+    /opt/timetable_spbu/scripts/check_telegram.py --tries 10
 ```
 
 Убедиться, что запущен ровно один экземпляр:
