@@ -14,7 +14,7 @@ def names(query: str) -> list[str]:
 
 def test_roster_loaded():
     assert roster.program == "MiM 2026"
-    assert len(roster.students) == 85
+    assert len(roster.students) == 92
     assert len(roster.subjects) == 7
 
 

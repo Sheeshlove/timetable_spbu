@@ -494,7 +494,7 @@ sudo systemctl restart timetable-bot
 каждому предмету, — сверьтесь с таблицей перед перезапуском:
 
 ```
-Студентов: 85
+Студентов: 92
 Убраны строки-копии (3): №52 Meleshko Mikhail, ...
   Corp. Finance    Coh.1, Coh.2
   QMBR seminars    Coh.1, Coh.2, Coh.3, Coh.4
