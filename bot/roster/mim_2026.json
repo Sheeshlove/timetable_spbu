@@ -1,6 +1,6 @@
 {
  "program": "MiM 2026",
- "source": "Cohorts_Distribution_MiM_2026.xlsx",
+ "source": "d6127d9b-Cohorts_Distribution_MiM_2026.xlsx",
  "subjects": [
   {
    "key": "corp_finance",
@@ -85,7 +85,7 @@
     "ru": "Кросс-культурный менеджмент",
     "en": "Cross-Cultural Management"
    },
-   "kind": "group",
+   "kind": "cohort",
    "match": [
     "кросс-культурный менеджмент",
     "кросскультурный менеджмент",
@@ -126,7 +126,26 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
+    "mps_1": "Zamulin"
+   }
+  },
+  {
+   "no": "6",
+   "name": "Ayere Alero Ifeoluwa",
+   "last_name": "Ayere",
+   "parts": [
+    "Ayere",
+    "Alero",
+    "Ifeoluwa"
+   ],
+   "cohorts": {
+    "corp_finance": "Coh.1",
+    "org_behaviour": "Coh.1",
+    "qmbr_lectures": "Coh.1",
+    "qmbr_seminars": "Coh.1",
+    "rs_1": "2",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
@@ -143,8 +162,8 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
@@ -161,8 +180,8 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
@@ -179,8 +198,8 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
@@ -197,13 +216,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "6",
+   "no": "7",
    "name": "Belyaev Yakov",
    "last_name": "Belyaev",
    "parts": [
@@ -215,13 +234,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "7",
+   "no": "8",
    "name": "Bienko Viktor",
    "last_name": "Bienko",
    "parts": [
@@ -233,13 +252,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "8",
+   "no": "9",
    "name": "Bobrova Arina",
    "last_name": "Bobrova",
    "parts": [
@@ -251,13 +270,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "9",
+   "no": "10",
    "name": "Borisenko Daria",
    "last_name": "Borisenko",
    "parts": [
@@ -269,13 +288,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "10",
+   "no": "11",
    "name": "Borisova Elizaveta",
    "last_name": "Borisova",
    "parts": [
@@ -287,13 +306,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "11",
+   "no": "12",
    "name": "Budzyka Kirill",
    "last_name": "Budzyka",
    "parts": [
@@ -305,13 +324,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "12",
+   "no": "13",
    "name": "Bulgakov Nikita",
    "last_name": "Bulgakov",
    "parts": [
@@ -323,13 +342,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "13",
+   "no": "14",
    "name": "Bulgakova Margarita",
    "last_name": "Bulgakova",
    "parts": [
@@ -341,13 +360,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "14",
+   "no": "15",
    "name": "Bymbygydenov Bato",
    "last_name": "Bymbygydenov",
    "parts": [
@@ -359,13 +378,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "15",
+   "no": "16",
    "name": "Valyayeva Mariya",
    "last_name": "Valyayeva",
    "parts": [
@@ -377,13 +396,31 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "16",
+   "no": "17",
+   "name": "Wang Xiaoyu",
+   "last_name": "Wang",
+   "parts": [
+    "Wang",
+    "Xiaoyu"
+   ],
+   "cohorts": {
+    "corp_finance": "Coh.1",
+    "org_behaviour": "Coh.1",
+    "qmbr_lectures": "Coh.1",
+    "qmbr_seminars": "Coh.1",
+    "rs_1": "2",
+    "ccm": "Coh.1",
+    "mps_1": "Zamulin"
+   }
+  },
+  {
+   "no": "18",
    "name": "Vasilenko Yaroslav",
    "last_name": "Vasilenko",
    "parts": [
@@ -395,13 +432,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "17",
+   "no": "19",
    "name": "Volkov Anatolii",
    "last_name": "Volkov",
    "parts": [
@@ -413,13 +450,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "18",
+   "no": "20",
    "name": "Voronin Maksim",
    "last_name": "Voronin",
    "parts": [
@@ -431,13 +468,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "2",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "19",
+   "no": "21",
    "name": "Vyslanko Pavel",
    "last_name": "Vyslanko",
    "parts": [
@@ -449,13 +486,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "20",
+   "no": "22",
    "name": "Gorbacheva Mariia",
    "last_name": "Gorbacheva",
    "parts": [
@@ -467,13 +504,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "21",
+   "no": "23",
    "name": "Gubarevich Emiliia",
    "last_name": "Gubarevich",
    "parts": [
@@ -485,13 +522,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "2",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "22",
+   "no": "24",
    "name": "Danilevskaya Yelizaveta",
    "last_name": "Danilevskaya",
    "parts": [
@@ -503,13 +540,13 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.1",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "3",
+    "ccm": "Coh.1",
     "mps_1": "Zamulin"
    }
   },
   {
-   "no": "23",
+   "no": "25",
    "name": "Danyo Kenneth Elorm Atsu",
    "last_name": "Danyo",
    "parts": [
@@ -523,13 +560,31 @@
     "org_behaviour": "Coh.1",
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "24",
+   "no": "28",
+   "name": "Datsven Dzhansyu",
+   "last_name": "Datsven",
+   "parts": [
+    "Datsven",
+    "Dzhansyu"
+   ],
+   "cohorts": {
+    "corp_finance": "Coh.1",
+    "org_behaviour": "Coh.1",
+    "qmbr_lectures": "Coh.1",
+    "qmbr_seminars": "Coh.2",
+    "rs_1": "2",
+    "ccm": "Coh.1",
+    "mps_1": "Pavlovskaya"
+   }
+  },
+  {
+   "no": "26",
    "name": "Deleu Lavinia",
    "last_name": "Deleu",
    "parts": [
@@ -542,12 +597,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "25",
+   "no": "27",
    "name": "Derbilova Daria",
    "last_name": "Derbilova",
    "parts": [
@@ -560,12 +615,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "26",
+   "no": "29",
    "name": "Janelidze Julieta",
    "last_name": "Janelidze",
    "parts": [
@@ -578,12 +633,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "27",
+   "no": "30",
    "name": "Didenko Andrei",
    "last_name": "Didenko",
    "parts": [
@@ -596,12 +651,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "28",
+   "no": "31",
    "name": "Druzhinin Maksim",
    "last_name": "Druzhinin",
    "parts": [
@@ -614,12 +669,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "29",
+   "no": "32",
    "name": "Emelyanov Yurii",
    "last_name": "Emelyanov",
    "parts": [
@@ -632,12 +687,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "30",
+   "no": "36",
    "name": "Zhegodskaia Kristina",
    "last_name": "Zhegodskaia",
    "parts": [
@@ -650,17 +705,17 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "31",
-   "name": "Zaostrovtseva Anastasiia",
-   "last_name": "Zaostrovtseva",
+   "no": "33",
+   "name": "Zamanova Adel",
+   "last_name": "Zamanova",
    "parts": [
-    "Zaostrovtseva",
-    "Anastasiia"
+    "Zamanova",
+    "Adel"
    ],
    "cohorts": {
     "corp_finance": "Coh.1",
@@ -668,12 +723,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "32",
+   "no": "34",
    "name": "Zaripova Valeria",
    "last_name": "Zaripova",
    "parts": [
@@ -686,12 +741,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "33",
+   "no": "35",
    "name": "Zakharov Mikhail",
    "last_name": "Zakharov",
    "parts": [
@@ -704,12 +759,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "34",
+   "no": "37",
    "name": "Zolotov Nikita",
    "last_name": "Zolotov",
    "parts": [
@@ -722,12 +777,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "35",
+   "no": "38",
    "name": "Zubarev Vitalii",
    "last_name": "Zubarev",
    "parts": [
@@ -740,12 +795,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "36",
+   "no": "40",
    "name": "Iklaspayeva Angelina",
    "last_name": "Iklaspayeva",
    "parts": [
@@ -758,12 +813,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "37",
+   "no": "42",
    "name": "Kirienkov Artem",
    "last_name": "Kirienkov",
    "parts": [
@@ -776,12 +831,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "38",
+   "no": "43",
    "name": "Kovalenko Kirill",
    "last_name": "Kovalenko",
    "parts": [
@@ -794,12 +849,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "39",
+   "no": "44",
    "name": "Kovalchuk Ksenia",
    "last_name": "Kovalchuk",
    "parts": [
@@ -812,12 +867,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "40",
+   "no": "45",
    "name": "Kozhina Ekaterina",
    "last_name": "Kozhina",
    "parts": [
@@ -830,12 +885,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "41",
+   "no": "46",
    "name": "Kornilov Konstantin",
    "last_name": "Kornilov",
    "parts": [
@@ -848,12 +903,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "42",
+   "no": "47",
    "name": "Kudyakova Arina",
    "last_name": "Kudyakova",
    "parts": [
@@ -866,12 +921,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "43",
+   "no": "48",
    "name": "Kulkova Polina",
    "last_name": "Kulkova",
    "parts": [
@@ -884,12 +939,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "44",
+   "no": "49",
    "name": "Kurkin Dmtrii",
    "last_name": "Kurkin",
    "parts": [
@@ -902,12 +957,12 @@
     "qmbr_lectures": "Coh.1",
     "qmbr_seminars": "Coh.2",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.1",
     "mps_1": "Pavlovskaya"
    }
   },
   {
-   "no": "45",
+   "no": "50",
    "name": "Malakovich Iuliia",
    "last_name": "Malakovich",
    "parts": [
@@ -920,12 +975,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "46",
+   "no": "51",
    "name": "Markelova Polina",
    "last_name": "Markelova",
    "parts": [
@@ -938,12 +993,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "47",
+   "no": "52",
    "name": "Markova Mariia",
    "last_name": "Markova",
    "parts": [
@@ -956,12 +1011,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "48",
+   "no": "53",
    "name": "Martyshev Dmitrii",
    "last_name": "Martyshev",
    "parts": [
@@ -974,12 +1029,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "49",
+   "no": "1",
    "name": "Meleshko Mikhail",
    "last_name": "Meleshko",
    "parts": [
@@ -992,12 +1047,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "50",
+   "no": "55",
    "name": "Mironova Mariia",
    "last_name": "Mironova",
    "parts": [
@@ -1010,12 +1065,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "51",
+   "no": "56",
    "name": "Morozov Ilia",
    "last_name": "Morozov",
    "parts": [
@@ -1028,12 +1083,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "55",
+   "no": "60",
    "name": "Nafhani Binti Azli",
    "last_name": "Nafhani",
    "parts": [
@@ -1047,12 +1102,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "56",
+   "no": "61",
    "name": "Nikiforova Melania",
    "last_name": "Nikiforova",
    "parts": [
@@ -1065,12 +1120,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "57",
+   "no": "62",
    "name": "Omarova Bibinyyaz",
    "last_name": "Omarova",
    "parts": [
@@ -1083,12 +1138,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "58",
+   "no": "63",
    "name": "Orshanskaia Ekaterina",
    "last_name": "Orshanskaia",
    "parts": [
@@ -1101,12 +1156,30 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "59",
+   "no": "64",
+   "name": "Panova Izabella",
+   "last_name": "Panova",
+   "parts": [
+    "Panova",
+    "Izabella"
+   ],
+   "cohorts": {
+    "corp_finance": "Coh.2",
+    "org_behaviour": "Coh.2",
+    "qmbr_lectures": "Coh.2",
+    "qmbr_seminars": "Coh.3",
+    "rs_1": "2",
+    "ccm": "Coh.2",
+    "mps_1": "Shevchuk 1"
+   }
+  },
+  {
+   "no": "65",
    "name": "Pechenenko Aleksandr",
    "last_name": "Pechenenko",
    "parts": [
@@ -1118,13 +1191,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "60",
+   "no": "66",
    "name": "Popov Mikhail",
    "last_name": "Popov",
    "parts": [
@@ -1136,13 +1209,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "61",
+   "no": "67",
    "name": "Rachin Andrei",
    "last_name": "Rachin",
    "parts": [
@@ -1154,13 +1227,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "62",
+   "no": "68",
    "name": "Rybina Irina",
    "last_name": "Rybina",
    "parts": [
@@ -1172,13 +1245,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "63",
+   "no": "69",
    "name": "Savinova Sofia",
    "last_name": "Savinova",
    "parts": [
@@ -1190,13 +1263,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "64",
+   "no": "70",
    "name": "Sarybayeva Jennet",
    "last_name": "Sarybayeva",
    "parts": [
@@ -1208,13 +1281,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "65",
+   "no": "71",
    "name": "Sen Yana",
    "last_name": "Sen",
    "parts": [
@@ -1226,13 +1299,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "66",
+   "no": "72",
    "name": "Smolyakov Danil",
    "last_name": "Smolyakov",
    "parts": [
@@ -1244,13 +1317,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.3",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "67",
+   "no": "95",
    "name": "Stepaniuk Viktoriia",
    "last_name": "Stepaniuk",
    "parts": [
@@ -1262,13 +1335,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "68",
+   "no": "73",
    "name": "Surkova Liudmila",
    "last_name": "Surkova",
    "parts": [
@@ -1280,13 +1353,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "69",
+   "no": "74",
    "name": "Sukhoveeva Valeriia",
    "last_name": "Sukhoveeva",
    "parts": [
@@ -1298,13 +1371,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 1"
    }
   },
   {
-   "no": "70",
+   "no": "75",
    "name": "Terina Daria",
    "last_name": "Terina",
    "parts": [
@@ -1316,13 +1389,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "71",
+   "no": "76",
    "name": "Tesakova Anastasiia",
    "last_name": "Tesakova",
    "parts": [
@@ -1334,13 +1407,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "72",
+   "no": "77",
    "name": "Tunik Matvei",
    "last_name": "Tunik",
    "parts": [
@@ -1352,13 +1425,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "73",
+   "no": "78",
    "name": "Ugolnikova Milana",
    "last_name": "Ugolnikova",
    "parts": [
@@ -1370,13 +1443,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "1",
-    "ccm": "1",
+    "rs_1": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "74",
+   "no": "79",
    "name": "Fedotkin Vadim",
    "last_name": "Fedotkin",
    "parts": [
@@ -1388,13 +1461,13 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "2",
-    "ccm": "2",
+    "rs_1": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "75",
+   "no": "80",
    "name": "Freidina Anna",
    "last_name": "Freidina",
    "parts": [
@@ -1406,13 +1479,50 @@
     "org_behaviour": "Coh.2",
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
-    "rs_1": "3",
-    "ccm": "3",
+    "rs_1": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "76",
+   "no": "39",
+   "name": "Hammoud Haya",
+   "last_name": "Hammoud",
+   "parts": [
+    "Hammoud",
+    "Haya"
+   ],
+   "cohorts": {
+    "corp_finance": "Coh.2",
+    "org_behaviour": "Coh.2",
+    "qmbr_lectures": "Coh.2",
+    "qmbr_seminars": "Coh.4",
+    "rs_1": "2",
+    "ccm": "Coh.2",
+    "mps_1": "Shevchuk 2"
+   }
+  },
+  {
+   "no": "41",
+   "name": "Khan Muhammad Moosa",
+   "last_name": "Khan",
+   "parts": [
+    "Khan",
+    "Muhammad",
+    "Moosa"
+   ],
+   "cohorts": {
+    "corp_finance": "Coh.2",
+    "org_behaviour": "Coh.2",
+    "qmbr_lectures": "Coh.2",
+    "qmbr_seminars": "Coh.4",
+    "rs_1": "3",
+    "ccm": "Coh.2",
+    "mps_1": "Shevchuk 2"
+   }
+  },
+  {
+   "no": "81",
    "name": "Khvorenkova Aleksandra",
    "last_name": "Khvorenkova",
    "parts": [
@@ -1425,12 +1535,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "77",
+   "no": "82",
    "name": "Cheplekina Arina",
    "last_name": "Cheplekina",
    "parts": [
@@ -1443,12 +1553,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "78",
+   "no": "83",
    "name": "Chernov Mark",
    "last_name": "Chernov",
    "parts": [
@@ -1461,12 +1571,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "79",
+   "no": "84",
    "name": "Shakhovskaya Elizaveta",
    "last_name": "Shakhovskaya",
    "parts": [
@@ -1479,12 +1589,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "80",
+   "no": "85",
    "name": "Shvachko Egor",
    "last_name": "Shvachko",
    "parts": [
@@ -1497,12 +1607,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "81",
+   "no": "86",
    "name": "Shevelev Danila",
    "last_name": "Shevelev",
    "parts": [
@@ -1515,12 +1625,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "82",
+   "no": "87",
    "name": "Shibaev Ivan",
    "last_name": "Shibaev",
    "parts": [
@@ -1533,12 +1643,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "83",
+   "no": "88",
    "name": "Shibaeva Polina",
    "last_name": "Shibaeva",
    "parts": [
@@ -1551,12 +1661,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "84",
+   "no": "89",
    "name": "Shimanskaia Angelina",
    "last_name": "Shimanskaia",
    "parts": [
@@ -1569,12 +1679,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "85",
+   "no": "90",
    "name": "Shishlov Egor",
    "last_name": "Shishlov",
    "parts": [
@@ -1587,12 +1697,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "86",
+   "no": "91",
    "name": "Shneiderman Anna",
    "last_name": "Shneiderman",
    "parts": [
@@ -1605,12 +1715,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "2",
-    "ccm": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "87",
+   "no": "92",
    "name": "Iurchenko Kseniia",
    "last_name": "Iurchenko",
    "parts": [
@@ -1623,12 +1733,12 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "3",
-    "ccm": "3",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   },
   {
-   "no": "88",
+   "no": "93",
    "name": "Yarovaiia Anastasiia",
    "last_name": "Yarovaiia",
    "parts": [
@@ -1641,7 +1751,25 @@
     "qmbr_lectures": "Coh.2",
     "qmbr_seminars": "Coh.4",
     "rs_1": "1",
-    "ccm": "1",
+    "ccm": "Coh.2",
+    "mps_1": "Shevchuk 2"
+   }
+  },
+  {
+   "no": "94",
+   "name": "Zaostrovtseva Anastasiia",
+   "last_name": "Zaostrovtseva",
+   "parts": [
+    "Zaostrovtseva",
+    "Anastasiia"
+   ],
+   "cohorts": {
+    "corp_finance": "Coh.2",
+    "org_behaviour": "Coh.2",
+    "qmbr_lectures": "Coh.2",
+    "qmbr_seminars": "Coh.4",
+    "rs_1": "2",
+    "ccm": "Coh.2",
     "mps_1": "Shevchuk 2"
    }
   }

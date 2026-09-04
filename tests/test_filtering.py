@@ -9,7 +9,7 @@ from bot.roster.filtering import belongs_to, filter_schedule
 from bot.timetable.models import Day, Event, Schedule
 
 roster = load_roster()
-# Coh.2 / Coh.2 / лекции Coh.2 / семинары Coh.4 / RS 1 / CCM 1 / MPS Shevchuk 2
+# Coh.2 / Coh.2 / лекции Coh.2 / семинары Coh.4 / RS 1 / CCM Coh.2 / MPS Shevchuk 2
 ME = roster.get("Shishlov Egor")
 
 
@@ -32,7 +32,7 @@ def test_fixture_student_has_expected_cohorts():
         "QMBR lecture Coh.2",
         "QMBR seminar Coh.4",
         "Research Seminar I, группа 1",
-        "Cross-Cultural Management (group 1)",
+        "Cross-Cultural Management (Coh.2)",
     ],
 )
 def test_my_cohort_is_shown(subject):
@@ -48,7 +48,7 @@ def test_my_cohort_is_shown(subject):
         "QMBR lecture Coh.1",
         "QMBR seminar Coh.3",
         "Research Seminar I, группа 3",
-        "Cross-Cultural Management (group 2)",
+        "Cross-Cultural Management (Coh.1)",
     ],
 )
 def test_foreign_cohort_is_hidden(subject):

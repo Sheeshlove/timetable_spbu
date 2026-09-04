@@ -18,7 +18,7 @@
 
 ```
 Corporate Finance — Coh.2      Research Seminar I — 1
-Organizational Behaviour — Coh.2   Cross-Cultural Management — 1
+Organizational Behaviour — Coh.2   Cross-Cultural Management — Coh.2
 QMBR, лекции — Coh.2           MPS I — Shevchuk 2
 QMBR, семинары — Coh.4
 ```
@@ -128,7 +128,7 @@ pip install -r requirements-dev.txt
 python scripts/import_cohorts.py Cohorts_Distribution_MiM_2026.xlsx
 ```
 
-Список — персональные данные 85 человек. Если репозиторий публичный, держите
+Список — персональные данные 92 человек. Если репозиторий публичный, держите
 файл вне git: положите его рядом с базой и укажите `ROSTER_PATH` в `.env`.
 
 Скрипт ждёт колонки `No.`, `Name, Last Name` и по одной на предмет
