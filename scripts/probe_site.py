@@ -179,7 +179,8 @@ async def _probe_schedule(
         _dump(dump, f"api_events_{lang}.json", payload)
         problems += 0 if schedule.days else 1
         if subjects is not None and schedule.days:
-            subjects[lang] = _subject_names(schedule)
+            subjects.setdefault(lang, _subject_names(schedule))
+        _print_raw_event(payload)
     except TimetableError as error:
         print(f"{FAIL} JSON-API недоступен: {error}")
         problems += 1
@@ -192,11 +193,26 @@ async def _probe_schedule(
         _print_schedule(schedule)
         _check_subgroups(schedule, "HTML")
         _dump(dump, f"week_page_{lang}.html", html)
-        if subjects is not None and lang not in subjects and schedule.days:
+        # Бот берёт названия со страницы, поэтому и язык сверяем по ней.
+        if subjects is not None and schedule.days:
             subjects[lang] = _subject_names(schedule)
     except TimetableError as error:
         print(f"{FAIL} HTML недоступен: {error}")
     return problems
+
+
+def _print_raw_event(payload) -> None:
+    """Показывает, из каких полей вообще состоит запись занятия в API.
+
+    Нужно, когда пометка подгруппы есть на странице, но не в API: по списку
+    полей видно, где её искать (или что её там нет вовсе).
+    """
+    days = payload.get("Days") or payload.get("StudyEventsDays") or []
+    for day in days:
+        events = day.get("DayStudyEvents") or day.get("StudyEvents") or []
+        if events:
+            print(f"   поля записи в API: {sorted(events[0])}")
+            return
 
 
 def _check_subgroups(schedule, source: str) -> int:
