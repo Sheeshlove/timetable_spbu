@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from html import escape
 
+from .changes import Diff, Slot
 from .i18n import Translator
+from .languages import choice_title
 from .roster import Roster, Student
 from .scheduling import DAILY, MONTHLY, OFF, WEEKLY
 from .storage import Note, Subscription
@@ -132,10 +134,26 @@ def format_subscription(
     else:
         lines.append(t("settings_no_student"))
 
+    if subscription.language_course:
+        lines.append(
+            t(
+                "settings_course_language",
+                course=escape(
+                    choice_title(
+                        subscription.language_course,
+                        subscription.language_teacher,
+                        t.lang,
+                    )
+                ),
+            )
+        )
     if student:
         lines.append(
             t("settings_filter_all") if subscription.show_all else t("settings_filter_mine")
         )
+    lines.append(
+        t("settings_notify_on") if subscription.notify_changes else t("settings_notify_off")
+    )
     lines.append(
         t("settings_frequency", frequency=frequency_title(subscription.frequency, t))
     )
@@ -148,6 +166,63 @@ def format_subscription(
     if student and not subscription.show_all:
         lines.append("\n" + format_cohorts(student, roster, t))
     return "\n".join(lines)
+
+
+def _slot_when(slot: Slot, t: Translator) -> str:
+    day = slot.day
+    when = human_date(day, t) if day else slot.date
+    return f"{when}, {slot.interval}" if slot.interval else when
+
+
+def _slot_title(slot: Slot) -> str:
+    title = escape(slot.subject)
+    return f"{title} · {escape(slot.subgroup)}" if slot.subgroup else title
+
+
+def _slot_line(slot: Slot, t: Translator) -> list[str]:
+    lines = [f"  🕘 <b>{escape(slot.interval)}</b> {_slot_title(slot)}"]
+    if slot.educators:
+        lines.append(f"     👤 {escape(slot.educators)}")
+    if slot.locations:
+        lines.append(f"     📍 {escape(slot.locations)}")
+    return lines
+
+
+def format_changes(diff: Diff, t: Translator) -> str:
+    """Сообщение о том, что изменилось в расписании."""
+    parts = [t("changes_title")]
+
+    for key, slots in (("changes_added", diff.added), ("changes_removed", diff.removed)):
+        if not slots:
+            continue
+        parts.append(f"\n<b>{t(key)}</b>")
+        current_day = None
+        for slot in slots:
+            if slot.date != current_day:
+                current_day = slot.date
+                day = slot.day
+                parts.append(f"<i>{escape(human_date(day, t) if day else slot.date)}</i>")
+            parts.extend(_slot_line(slot, t))
+
+    if diff.moved:
+        parts.append(f"\n<b>{t('changes_moved')}</b>")
+        for old, new in diff.moved:
+            parts.append(f"  {_slot_title(new)}")
+            parts.append(f"     {t('changes_was', value=escape(_slot_when(old, t)))}")
+            parts.append(f"     {t('changes_now', value=escape(_slot_when(new, t)))}")
+
+    if diff.edited:
+        parts.append(f"\n<b>{t('changes_edited')}</b>")
+        for old, new, fields in diff.edited:
+            parts.append(f"  {_slot_title(new)} · {escape(_slot_when(new, t))}")
+            for field_name in fields:
+                label = t(f"changes_field_{field_name}")
+                was = escape(getattr(old, field_name)) or "—"
+                now = escape(getattr(new, field_name)) or "—"
+                parts.append(f"     {label}: {was} → {now}")
+
+    parts.append(f"\n<i>{t('changes_hint')}</i>")
+    return "\n".join(parts)
 
 
 def format_notes(notes: list[Note], tz, t: Translator) -> str:

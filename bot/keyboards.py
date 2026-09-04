@@ -10,6 +10,7 @@ from aiogram.types import (
 )
 
 from .i18n import LANGUAGE_NAMES, Translator
+from .languages import NONE as COURSE_NONE, language_name
 from .scheduling import DAILY, MONTHLY, OFF, WEEKLY
 
 
@@ -36,6 +37,41 @@ def language_keyboard(current: str | None = None) -> InlineKeyboardMarkup:
             for code, name in LANGUAGE_NAMES.items()
         ]
     )
+
+
+def course_language_keyboard(keys: list[str], t: Translator) -> InlineKeyboardMarkup:
+    """Изучаемый иностранный язык: список берётся из живого расписания."""
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=language_name(key, t.lang), callback_data=f"course:{key}"
+            )
+        ]
+        for key in keys
+    ]
+    rows.append(
+        [InlineKeyboardButton(text=t("btn_course_all"), callback_data="course:all")]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=t("btn_course_none"), callback_data=f"course:{COURSE_NONE}"
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def course_teacher_keyboard(teachers: list[str], t: Translator) -> InlineKeyboardMarkup:
+    """Уточнение группы, когда у языка несколько преподавателей."""
+    rows = [
+        [InlineKeyboardButton(text=_shorten(name), callback_data=f"teacher:{index}")]
+        for index, name in enumerate(teachers)
+    ]
+    rows.append(
+        [InlineKeyboardButton(text=t("btn_any_teacher"), callback_data="teacher:any")]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def students_keyboard(labels: list[str], t: Translator) -> InlineKeyboardMarkup:
@@ -95,13 +131,25 @@ def time_keyboard(current_hour: int | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def settings_keyboard(t: Translator, show_all: bool = False) -> InlineKeyboardMarkup:
+def settings_keyboard(
+    t: Translator, show_all: bool = False, notify_changes: bool = True
+) -> InlineKeyboardMarkup:
     filter_title = t("btn_settings_show_mine") if show_all else t("btn_settings_show_all")
+    notify_title = (
+        t("btn_settings_notify_off") if notify_changes else t("btn_settings_notify_on")
+    )
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=t("btn_settings_freq"), callback_data="settings:freq")],
+            [InlineKeyboardButton(text=notify_title, callback_data="settings:notify")],
             [InlineKeyboardButton(text=t("btn_settings_time"), callback_data="settings:time")],
             [InlineKeyboardButton(text=filter_title, callback_data="settings:filter")],
+            [
+                InlineKeyboardButton(
+                    text=t("btn_settings_course_language"),
+                    callback_data="settings:course",
+                )
+            ],
             [
                 InlineKeyboardButton(
                     text=t("btn_settings_student"), callback_data="settings:student"

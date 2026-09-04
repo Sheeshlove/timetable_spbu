@@ -7,6 +7,7 @@
     python scripts/probe_site.py --group 474489        # другая группа
     python scripts/probe_site.py --lang en             # проверить английскую версию
     python scripts/probe_site.py --dump tests/fixtures # сохранить ответы
+    python scripts/probe_site.py --student Шишлов      # как бот отбирает пары
 
 Скрипт показывает, какой способ получения данных работает — JSON-API или
 разбор HTML, — и что именно распарсилось. Если сайт поменяет разметку,
@@ -25,6 +26,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from bot.languages import detect_language, language_name, teachers_for  # noqa: E402
+from bot.roster import load_roster  # noqa: E402
+from bot.roster.filtering import belongs_to, marker_text, matching_subjects  # noqa: E402
 from bot.timetable import api, scraper  # noqa: E402
 from bot.timetable.client import TimetableClient, TimetableError  # noqa: E402
 
@@ -32,7 +36,9 @@ OK = "✅"
 FAIL = "❌"
 
 
-async def probe(alias: str, group_id: int, dump: Path | None, langs: list[str]) -> int:
+async def probe(
+    alias: str, group_id: int, dump: Path | None, langs: list[str], student: str | None
+) -> int:
     client = TimetableClient(cache_ttl=0)
     problems = 0
     subjects: dict[str, list[str]] = {}
@@ -40,9 +46,87 @@ async def probe(alias: str, group_id: int, dump: Path | None, langs: list[str]) 
         for lang in langs:
             problems += await _probe_schedule(client, alias, group_id, dump, lang, subjects)
         problems += _compare_languages(subjects)
+        if student:
+            problems += await _probe_student(client, alias, group_id, student)
     finally:
         await client.close()
     return problems
+
+
+async def _probe_student(
+    client: TimetableClient, alias: str, group_id: int, query: str
+) -> int:
+    """Показывает, как бот отбирает пары для конкретного студента.
+
+    Именно здесь видно, почему занятие осталось или пропало: какая у него
+    пометка потока, какого преподавателя написал сайт и что об этом думает
+    фильтр.
+    """
+    print(f"\n=== Отбор занятий для «{query}» ===")
+    roster = load_roster()
+    found = roster.find(query)
+    if not found:
+        print(f"{FAIL} В списке программы такой фамилии нет.")
+        return 1
+    if len(found) > 1:
+        print(f"   Совпадений несколько: {[s.name for s in found]} — беру первое.")
+    student = found[0]
+    print(f"   {student.name}: " + ", ".join(f"{k}={v}" for k, v in student.cohorts.items()))
+
+    monday = date.today() - timedelta(days=date.today().weekday())
+    try:
+        schedule = await client.schedule(
+            group_id, monday, monday + timedelta(days=27), alias
+        )
+    except TimetableError as error:
+        print(f"{FAIL} Расписание не получено: {error}")
+        return 1
+
+    unclear = 0
+    for day in schedule.days:
+        for event in day.events:
+            subjects_matched = matching_subjects(event.subject, roster)
+            language = detect_language(event)
+            if not subjects_matched and language is None:
+                continue  # общая пара, фильтра не касается
+
+            visible, reason = belongs_to(event, student, roster)
+            mark = "показать" if visible else "СКРЫТЬ  "
+            labels = [s.column for s in subjects_matched] or [
+                f"язык: {language_name(language)}"
+            ]
+            print(f"   {mark} {day.date} {event.interval} {event.subject[:44]}")
+            print(
+                f"            предмет={labels} поток={event.subgroup!r}"
+                f" преподаватель={event.educators!r}"
+            )
+            if reason:
+                print(f"            причина: {reason}")
+            elif visible and subjects_matched and not event.subgroup:
+                # Самый частый источник жалоб «бот не различает подгруппы»
+                mine = {s.column: student.cohorts.get(s.key) for s in subjects_matched}
+                if any(_has_number(value) for value in mine.values()):
+                    unclear += 1
+                    print(
+                        "            ⚠ у пары нет пометки потока, а в ведомости"
+                        f" номер есть ({mine}) — различить подгруппы нечем"
+                    )
+
+    for key in ("de", "fr", "es", "en", "ru_foreign"):
+        teachers = teachers_for(schedule, key)
+        if len(teachers) > 1:
+            print(f"   Языковые группы, {language_name(key)}: {teachers}")
+
+    if unclear:
+        print(
+            f"\n{FAIL} Пар без пометки потока: {unclear}."
+            " Пришлите этот вывод — по нему видно, чем сайт различает группы."
+        )
+    return 0
+
+
+def _has_number(value: str | None) -> bool:
+    return bool(value) and any(char.isdigit() for char in value)
 
 
 def _compare_languages(subjects: dict[str, list[str]]) -> int:
@@ -151,10 +235,13 @@ def main() -> None:
         choices=["ru", "en"],
         help="язык расписания; можно указать дважды для сравнения (по умолчанию оба)",
     )
+    parser.add_argument(
+        "--student", help="фамилия студента: показать, как бот отбирает его пары"
+    )
     args = parser.parse_args()
 
     problems = asyncio.run(
-        probe(args.alias, args.group, args.dump, args.lang or ["ru", "en"])
+        probe(args.alias, args.group, args.dump, args.lang or ["ru", "en"], args.student)
     )
     print(
         f"\n{OK} Расписание читается."

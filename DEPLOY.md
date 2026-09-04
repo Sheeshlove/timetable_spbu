@@ -29,7 +29,7 @@
 * **Сервер** с Linux: Ubuntu 22.04/24.04 или Debian 12. Хватит самой дешёвой
   VPS — 1 ядро, 512 МБ памяти, 5 ГБ диска. Бот работает на long polling,
   поэтому **внешний IP, домен и открытые порты не нужны**.
-* **Python 3.11 или новее.**
+* **Python 3.10 или новее** — подойдёт системный на Ubuntu 22.04 и новее.
 * **Исходящий доступ в интернет** к `api.telegram.org` и `timetable.spbu.ru`.
 * Токен бота от [@BotFather](https://t.me/BotFather).
 * Доступ к серверу по SSH с правами `sudo`.
@@ -122,15 +122,17 @@ ufw status
 python3 --version
 ```
 
-**Если 3.11 или новее** (Ubuntu 24.04 — 3.12, Debian 12 — 3.11) — доставьте
-только модуль venv:
+**Если 3.10 или новее** — а это Ubuntu 22.04 (3.10), Ubuntu 24.04 (3.12) и
+Debian 12 (3.11) — ставить ничего не нужно, кроме модуля venv:
 
 ```bash
 apt install -y python3-venv python3-pip
 ```
 
-**Если версия старее** (Ubuntu 22.04 идёт с 3.10) — поставьте Python 3.11 из
-PPA deadsnakes:
+Набор тестов проходит и на 3.10, и на 3.12, так что системного Python хватает.
+
+**Если версия совсем старая** (3.9 и ниже) — поставьте Python 3.11 из PPA
+deadsnakes и дальше подставляйте `python3.11` вместо `python3`:
 
 ```bash
 apt install -y software-properties-common
@@ -139,8 +141,6 @@ apt update
 apt install -y python3.11 python3.11-venv
 python3.11 --version
 ```
-
-Дальше в командах, где написано `python3`, подставляйте `python3.11`.
 
 Компиляторы и dev-пакеты не нужны: все зависимости ставятся из готовых
 бинарных пакетов.
@@ -204,6 +204,8 @@ TZ_NAME=Europe/Moscow
 TIMETABLE_BASE_URL=https://timetable.spbu.ru
 HTTP_CACHE_TTL=900
 HTTP_TIMEOUT=20
+CHANGE_CHECK_HOURS=3
+CHANGE_WINDOW_DAYS=14
 LOG_LEVEL=INFO
 ```
 
@@ -219,6 +221,8 @@ LOG_LEVEL=INFO
 | `TIMETABLE_BASE_URL` | Адрес сайта расписания |
 | `HTTP_CACHE_TTL` | Сколько секунд держать ответы сайта в кэше |
 | `HTTP_TIMEOUT` | Таймаут запроса к сайту, секунды |
+| `CHANGE_CHECK_HOURS` | Как часто сверять расписание с прошлым слепком (часы) |
+| `CHANGE_WINDOW_DAYS` | На сколько дней вперёд следить за изменениями |
 | `LOG_LEVEL` | `INFO` для обычной работы, `DEBUG` при разборе проблем |
 
 Идентификатор группы берётся из адреса расписания на сайте:
@@ -285,7 +289,7 @@ cd /opt/timetable_spbu
 sudo -u timetable /opt/timetable_spbu/.venv/bin/python -m pytest -q
 ```
 
-Ожидается `192 passed`.
+Ожидается `263 passed`.
 
 ### Пробный запуск руками
 
@@ -345,9 +349,11 @@ systemctl disable --now timetable-bot   # выключить и убрать и�
 1. Откройте бота и отправьте `/start`.
 2. Выберите язык — русский или английский.
 3. Напишите свою фамилию — бот покажет найденного студента и его когорты.
-4. Нажмите «Это я», выберите периодичность и время рассылки.
-5. Отправьте `/today` — придёт расписание на сегодня, уже без чужих когорт.
-6. Отправьте любой текст, например `сдать эссе`, и выберите день — бот
+4. Нажмите «Это я» и укажите изучаемый иностранный язык.
+5. Выберите периодичность и время рассылки.
+6. Отправьте `/today` — придёт расписание на сегодня, без чужих когорт и
+   чужих языковых пар.
+7. Отправьте любой текст, например `сдать эссе`, и выберите день — бот
    подтвердит, что пришлёт заметку.
 
 Проверить, что рассылка запланирована, можно прямо в базе:
@@ -357,7 +363,8 @@ sudo -u timetable /opt/timetable_spbu/.venv/bin/python - <<'PY'
 import sqlite3
 conn = sqlite3.connect("/opt/timetable_spbu/data/bot.sqlite3")
 for row in conn.execute(
-    "SELECT user_id, student_name, lang, show_all, frequency, send_hour, next_run_at"
+    "SELECT user_id, student_name, lang, language_course, show_all, frequency,"
+    " send_hour, next_run_at"
     " FROM subscriptions"
 ):
     print(row)

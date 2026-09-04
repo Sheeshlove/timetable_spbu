@@ -91,6 +91,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "settings_title": "<b>Ваши настройки</b>",
         "settings_program": "🎓 Программа: {program}",
         "settings_language": "🌐 Язык: {language}",
+        "settings_course_language": "🗣 Иностранный язык: {course}",
         "settings_student": "👤 Вы: {name}",
         "settings_student_missing": (
             "👤 Вы: {name} (в текущем списке не найдены — обновите фамилию)"
@@ -104,6 +105,41 @@ TEXTS: dict[str, dict[str, str]] = {
         "cohorts_title": "<b>Ваши когорты</b>",
         "cohorts_empty": "Когорты для вас в списке не указаны.",
         "cohorts_unknown": "Фамилия не указана или вас нет в списке программы. Указать: /setup",
+        "ask_course_language": (
+            "Какой иностранный язык вы изучаете? Языковые пары идут параллельными "
+            "потоками, и я оставлю в расписании только ваш."
+        ),
+        "ask_course_teacher": (
+            "У этого языка несколько групп. Выберите своего преподавателя — "
+            "или «Любая группа», если пока не знаете."
+        ),
+        "course_language_saved": "Записал: <b>{course}</b>",
+        "course_language_none": "Хорошо, языковые пары показывать не буду.",
+        "course_language_all": "Хорошо, буду показывать все языковые пары.",
+        "hidden_language_note": "Скрыто чужих языковых пар: {count}.",
+        "btn_course_none": "Не изучаю",
+        "btn_course_all": "Показывать все",
+        "btn_any_teacher": "Любая группа",
+        "btn_settings_course_language": "🗣 Иностранный язык",
+        "course_language_unknown": (
+            "Не удалось получить список языков с сайта — вот обычный набор."
+        ),
+        "changes_title": "🔄 Расписание изменилось",
+        "changes_added": "➕ Добавилось",
+        "changes_removed": "➖ Убрали",
+        "changes_moved": "🔀 Перенесли",
+        "changes_edited": "✏️ Изменилось",
+        "changes_was": "было: {value}",
+        "changes_now": "стало: {value}",
+        "changes_field_locations": "аудитория",
+        "changes_field_educators": "преподаватель",
+        "changes_hint": "Я слежу за расписанием сам; выключить — в «⚙️ Настройки».",
+        "settings_notify_on": "🔄 Слежу за изменениями расписания",
+        "settings_notify_off": "🔄 За изменениями расписания не слежу",
+        "btn_settings_notify_on": "🔄 Следить за изменениями",
+        "btn_settings_notify_off": "🔕 Не следить за изменениями",
+        "toast_notify_on": "Буду сообщать об изменениях",
+        "toast_notify_off": "Больше не слежу за изменениями",
         # --- расписание ---
         "loading": "Смотрю расписание…",
         "site_down": "Сайт расписания не отвечает 😕 Попробуйте позже.",
@@ -221,6 +257,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "settings_title": "<b>Your settings</b>",
         "settings_program": "🎓 Programme: {program}",
         "settings_language": "🌐 Language: {language}",
+        "settings_course_language": "🗣 Foreign language: {course}",
         "settings_student": "👤 You: {name}",
         "settings_student_missing": (
             "👤 You: {name} (not in the current roster — update your last name)"
@@ -234,6 +271,41 @@ TEXTS: dict[str, dict[str, str]] = {
         "cohorts_title": "<b>Your cohorts</b>",
         "cohorts_empty": "The roster lists no cohorts for you.",
         "cohorts_unknown": "No last name set, or you are not in the roster. Set it: /setup",
+        "ask_course_language": (
+            "Which foreign language do you study? Language classes run in parallel "
+            "streams, and I will keep only yours in the timetable."
+        ),
+        "ask_course_teacher": (
+            "This language has several groups. Pick your teacher — or «Any group» "
+            "if you do not know yet."
+        ),
+        "course_language_saved": "Saved: <b>{course}</b>",
+        "course_language_none": "Fine, I will not show language classes.",
+        "course_language_all": "Fine, I will show all language classes.",
+        "hidden_language_note": "Hidden language classes of other groups: {count}.",
+        "btn_course_none": "I don't study one",
+        "btn_course_all": "Show all of them",
+        "btn_any_teacher": "Any group",
+        "btn_settings_course_language": "🗣 Foreign language",
+        "course_language_unknown": (
+            "Could not fetch the language list from the site — here is the usual set."
+        ),
+        "changes_title": "🔄 The timetable has changed",
+        "changes_added": "➕ Added",
+        "changes_removed": "➖ Removed",
+        "changes_moved": "🔀 Moved",
+        "changes_edited": "✏️ Updated",
+        "changes_was": "was: {value}",
+        "changes_now": "now: {value}",
+        "changes_field_locations": "room",
+        "changes_field_educators": "teacher",
+        "changes_hint": "I check the timetable myself; turn it off in «⚙️ Settings».",
+        "settings_notify_on": "🔄 Watching the timetable for changes",
+        "settings_notify_off": "🔄 Not watching the timetable for changes",
+        "btn_settings_notify_on": "🔄 Watch for changes",
+        "btn_settings_notify_off": "🔕 Stop watching for changes",
+        "toast_notify_on": "I will report changes",
+        "toast_notify_off": "No longer watching for changes",
         "loading": "Fetching the timetable…",
         "site_down": "The timetable site is not responding 😕 Please try later.",
         "site_down_setup": (

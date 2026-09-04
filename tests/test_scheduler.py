@@ -106,7 +106,8 @@ async def test_digest_is_sent_and_next_run_advances(storage, tmp_path):
     assert await scheduler.tick(now) == 1
     assert bot.sent[0][0] == 100
     assert "Микроэкономика" in bot.sent[0][1]
-    assert timetable.calls == [(474489, date(2026, 8, 31), date(2026, 8, 31))]
+    # Первый заход — рассылка; следом тикер снимает слепок для слежения.
+    assert timetable.calls[0] == (474489, date(2026, 8, 31), date(2026, 8, 31))
 
     updated = await storage.get_subscription(1)
     assert updated.next_run_at == now + timedelta(days=1)
@@ -119,7 +120,7 @@ async def test_weekly_digest_covers_whole_week(storage, tmp_path):
     scheduler = Scheduler(FakeBot(), storage, timetable, make_settings(tmp_path), ROSTER)
 
     await scheduler.tick(now)
-    assert timetable.calls == [(474489, date(2026, 8, 31), date(2026, 9, 6))]
+    assert timetable.calls[0] == (474489, date(2026, 8, 31), date(2026, 9, 6))
     assert (await storage.get_subscription(1)).next_run_at == now + timedelta(days=7)
 
 
@@ -277,3 +278,186 @@ async def test_unknown_student_gets_full_schedule(storage, tmp_path):
     text = bot.sent[0][1]
     assert "Coh.1" in text and "Coh.2" in text
     assert "Вас нет в текущем списке" in text
+
+
+# --- Слежение за изменениями ---------------------------------------------
+
+DAY = datetime(2026, 8, 31, 6, 0, tzinfo=timezone.utc)  # 09:00 МСК, рабочее время
+WINDOW = (date(2026, 8, 31), date(2026, 9, 14))
+
+
+def changed_schedule() -> Schedule:
+    """То же расписание, но добавилась ещё одна пара."""
+    return Schedule(
+        group_id=474489,
+        group_name="Менеджмент 2026",
+        days=[
+            Day(
+                date=date(2026, 8, 31),
+                title="",
+                events=[
+                    Event(subject="Микроэкономика", time_text="10:00–11:35"),
+                    Event(subject="Маркетинг", time_text="12:00–13:35"),
+                ],
+            )
+        ],
+    )
+
+
+class RangeTimetable(FakeTimetable):
+    """Фейк, который честно отдаёт только дни из запрошенного окна."""
+
+    async def schedule(self, group_id, start, end, alias=None, lang="ru"):
+        full = await super().schedule(group_id, start, end, alias, lang)
+        days = [day for day in full.days if day.date and start <= day.date <= end]
+        return Schedule(
+            group_id=full.group_id, group_name=full.group_name, days=days, url=full.url
+        )
+
+
+async def test_first_check_only_remembers_schedule(storage, tmp_path):
+    """Первую проверку сравнивать не с чем — молчим и запоминаем."""
+    await storage.save_subscription(subscription())
+    bot, timetable = FakeBot(), FakeTimetable(sample_schedule())
+    scheduler = Scheduler(bot, storage, timetable, make_settings(tmp_path), ROSTER)
+
+    assert await scheduler.tick(DAY) == 0
+    assert bot.sent == []
+    assert timetable.calls == [(474489, *WINDOW)]
+
+    snapshot = await storage.get_snapshot(1)
+    assert [item.subject for item in snapshot.slots] == ["Микроэкономика"]
+    assert (await storage.get_subscription(1)).next_check_at == DAY + timedelta(hours=3)
+
+
+async def test_new_class_is_reported(storage, tmp_path):
+    await storage.save_subscription(subscription())
+    bot, timetable = FakeBot(), FakeTimetable(sample_schedule())
+    scheduler = Scheduler(bot, storage, timetable, make_settings(tmp_path), ROSTER)
+    await scheduler.tick(DAY)
+
+    timetable.schedule_result = changed_schedule()
+    later = DAY + timedelta(hours=3)
+    assert await scheduler.tick(later) == 1
+
+    chat, text = bot.sent[0]
+    assert chat == 100
+    assert "Расписание изменилось" in text
+    assert "Маркетинг" in text
+    assert "Микроэкономика" not in text  # не менялась — и в письме её нет
+    assert (await storage.get_subscription(1)).next_check_at == later + timedelta(hours=3)
+
+
+async def test_unchanged_schedule_is_silent(storage, tmp_path):
+    await storage.save_subscription(subscription())
+    bot, timetable = FakeBot(), FakeTimetable(sample_schedule())
+    scheduler = Scheduler(bot, storage, timetable, make_settings(tmp_path), ROSTER)
+
+    await scheduler.tick(DAY)
+    assert await scheduler.tick(DAY + timedelta(hours=3)) == 0
+    assert bot.sent == []
+
+
+async def test_changed_filter_rebaselines_without_message(storage, tmp_path):
+    """Студент сам переключил фильтр — это не изменение расписания."""
+    await storage.save_subscription(subscription())
+    bot, timetable = FakeBot(), FakeTimetable(await cohort_schedule())
+    scheduler = Scheduler(bot, storage, timetable, make_settings(tmp_path), ROSTER)
+    await scheduler.tick(DAY)
+
+    await storage.save_subscription(subscription(show_all=True))
+    later = DAY + timedelta(hours=3)
+    assert await scheduler.tick(later) == 0
+    assert bot.sent == []
+
+    snapshot = await storage.get_snapshot(1)
+    assert len(snapshot.slots) == 2  # запомнили уже расписание без фильтра
+
+
+async def test_sliding_window_is_not_a_change(storage, tmp_path):
+    """Вчерашний день ушёл из окна — «отменённых» пар быть не должно."""
+    await storage.save_subscription(subscription())
+    bot = FakeBot()
+    scheduler = Scheduler(
+        bot, storage, RangeTimetable(sample_schedule()), make_settings(tmp_path), ROSTER
+    )
+
+    await scheduler.tick(DAY)
+    assert await scheduler.tick(DAY + timedelta(days=1)) == 0
+    assert bot.sent == []
+
+
+async def test_quiet_hours_postpone_the_check(storage, tmp_path):
+    """Ночью бот не будит: проверка переезжает на утро."""
+    await storage.save_subscription(subscription())
+    night = datetime(2026, 8, 31, 0, 0, tzinfo=timezone.utc)  # 03:00 МСК
+    timetable = FakeTimetable(sample_schedule())
+    scheduler = Scheduler(FakeBot(), storage, timetable, make_settings(tmp_path), ROSTER)
+
+    assert await scheduler.tick(night) == 0
+    assert timetable.calls == []  # на сайт даже не ходили
+    assert (await storage.get_subscription(1)).next_check_at == datetime(
+        2026, 8, 31, 5, 0, tzinfo=timezone.utc
+    )  # 08:00 МСК
+
+
+async def test_late_evening_check_waits_for_morning(storage, tmp_path):
+    await storage.save_subscription(subscription())
+    evening = datetime(2026, 8, 31, 20, 0, tzinfo=timezone.utc)  # 23:00 МСК
+    scheduler = Scheduler(
+        FakeBot(), storage, FakeTimetable(sample_schedule()), make_settings(tmp_path), ROSTER
+    )
+
+    await scheduler.tick(evening)
+    assert (await storage.get_subscription(1)).next_check_at == datetime(
+        2026, 9, 1, 5, 0, tzinfo=timezone.utc
+    )
+
+
+async def test_site_failure_keeps_the_snapshot(storage, tmp_path):
+    await storage.save_subscription(subscription())
+    timetable = FakeTimetable(sample_schedule())
+    scheduler = Scheduler(FakeBot(), storage, timetable, make_settings(tmp_path), ROSTER)
+    await scheduler.tick(DAY)
+
+    timetable.error = TimetableError("сайт лёг")
+    later = DAY + timedelta(hours=3)
+    assert await scheduler.tick(later) == 0
+
+    snapshot = await storage.get_snapshot(1)
+    assert [item.subject for item in snapshot.slots] == ["Микроэкономика"]
+    assert (await storage.get_subscription(1)).next_check_at == later + timedelta(minutes=15)
+
+
+async def test_watching_can_be_turned_off(storage, tmp_path):
+    await storage.save_subscription(subscription(notify_changes=False))
+    timetable = FakeTimetable(sample_schedule())
+    scheduler = Scheduler(FakeBot(), storage, timetable, make_settings(tmp_path), ROSTER)
+
+    assert await scheduler.tick(DAY) == 0
+    assert timetable.calls == []
+    assert await storage.get_snapshot(1) is None
+
+
+async def test_blocked_user_is_no_longer_watched(storage, tmp_path):
+    await storage.save_subscription(subscription())
+    bot, timetable = FakeBot(), FakeTimetable(sample_schedule())
+    scheduler = Scheduler(bot, storage, timetable, make_settings(tmp_path), ROSTER)
+    await scheduler.tick(DAY)
+
+    bot.fail_with = TelegramForbiddenError(method=None, message="bot was blocked")
+    timetable.schedule_result = changed_schedule()
+    assert await scheduler.tick(DAY + timedelta(hours=3)) == 0
+    assert (await storage.get_subscription(1)).notify_changes is False
+
+
+async def test_one_request_per_language_for_many_students(storage, tmp_path):
+    """Группа у всех одна: на десять студентов — один заход на сайт."""
+    for user_id in range(1, 11):
+        await storage.save_subscription(subscription(user_id=user_id, chat_id=100 + user_id))
+    timetable = FakeTimetable(sample_schedule())
+    scheduler = Scheduler(FakeBot(), storage, timetable, make_settings(tmp_path), ROSTER)
+
+    await scheduler.tick(DAY)
+    assert timetable.calls == [(474489, *WINDOW)]
+    assert len((await storage.get_snapshot(10)).slots) == 1
