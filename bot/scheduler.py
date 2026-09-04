@@ -58,7 +58,6 @@ def filter_key(subscription: Subscription) -> str:
             str(int(subscription.show_all)),
             subscription.language_course,
             subscription.language_teacher,
-            subscription.subgroup,
             subscription.lang,
         )
     )

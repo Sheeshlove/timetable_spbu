@@ -124,25 +124,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "course_language_unknown": (
             "Не удалось получить список языков с сайта — вот обычный набор."
         ),
-        # --- подгруппа у преподавателя ---
-        "settings_subgroup": "👥 Подгруппа: {value}",
-        "subgroup_label": "Подгруппа {number}",
-        "subgroup_any": "все пары моего преподавателя",
-        "ask_subgroup": (
-            "У вашего преподавателя <b>{educator}</b> несколько подгрупп. "
-            "Какая ваша?\n\nВ ведомости деканата стоит «{cohort}», но на сайте "
-            "подгруппы нумеруются по всему потоку, поэтому номера могут не "
-            "совпадать. Ориентируйтесь на время занятий:"
-        ),
-        "subgroup_option": "  · <b>{label}</b> — {when}",
-        "subgroup_saved": "Запомнил: <b>{subgroup}</b>",
-        "subgroup_all_saved": "Хорошо, буду показывать пары обеих подгрупп.",
-        "subgroup_single": "У вашего преподавателя одна подгруппа — выбирать нечего.",
-        "subgroup_unknown": (
-            "Не удалось посмотреть расписание на сайте — спрошу про подгруппу позже."
-        ),
-        "btn_subgroup_all": "Не знаю, показывать все",
-        "btn_settings_subgroup": "👥 Моя подгруппа",
         "changes_title": "🔄 Расписание изменилось",
         "changes_added": "➕ Добавилось",
         "changes_removed": "➖ Убрали",
@@ -309,26 +290,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "course_language_unknown": (
             "Could not fetch the language list from the site — here is the usual set."
         ),
-        # --- подгруппа у преподавателя ---
-        "settings_subgroup": "👥 Subgroup: {value}",
-        "subgroup_label": "Subgroup {number}",
-        "subgroup_any": "every class of my teacher",
-        "ask_subgroup": (
-            "Your teacher <b>{educator}</b> runs several subgroups. Which one is "
-            "yours?\n\nThe faculty list says «{cohort}», but the site numbers "
-            "subgroups across the whole stream, so the numbers may differ. Go by "
-            "the class times:"
-        ),
-        "subgroup_option": "  · <b>{label}</b> — {when}",
-        "subgroup_saved": "Saved: <b>{subgroup}</b>",
-        "subgroup_all_saved": "Fine, I will show the classes of both subgroups.",
-        "subgroup_single": "Your teacher has a single subgroup — nothing to choose.",
-        "subgroup_unknown": (
-            "Could not read the timetable from the site — I will ask about the "
-            "subgroup later."
-        ),
-        "btn_subgroup_all": "Not sure, show all",
-        "btn_settings_subgroup": "👥 My subgroup",
         "changes_title": "🔄 The timetable has changed",
         "changes_added": "➕ Added",
         "changes_removed": "➖ Removed",

@@ -28,13 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bot.languages import detect_language, language_name, teachers_for  # noqa: E402
 from bot.roster import load_roster  # noqa: E402
-from bot.roster.filtering import (  # noqa: E402
-    belongs_to,
-    educator_subgroups,
-    educator_value,
-    marker_text,
-    matching_subjects,
-)
+from bot.roster.filtering import belongs_to, marker_text, matching_subjects  # noqa: E402
 from bot.timetable import api, scraper  # noqa: E402
 from bot.timetable.client import TimetableClient, TimetableError  # noqa: E402
 
@@ -118,22 +112,6 @@ async def _probe_student(
                         f" номер есть ({mine}) — различить подгруппы нечем"
                     )
 
-    # Подгруппы преподавателя: по ведомости («Shevchuk 2») их не различить,
-    # потому что сайт нумерует подгруппы по всему потоку. Показываем, какие
-    # номера вообще есть у преподавателя студента — это и предлагает бот.
-    groups = educator_subgroups(schedule, student, roster)
-    if groups:
-        print(f"\n   Подгруппы преподавателя (в ведомости: {educator_value(student, roster)!r}):")
-        for number, entries in groups.items():
-            when = ", ".join(
-                dict.fromkeys(
-                    f"{day} {event.interval}" for day, event in entries[:3]
-                )
-            )
-            print(f"     Подгруппа {number}: {when}")
-        if len(groups) > 1:
-            print("     ⚠ выбрать свою студент должен сам — «⚙️ Настройки» → «Моя подгруппа»")
-
     for key in ("de", "fr", "es", "en", "ru_foreign"):
         teachers = teachers_for(schedule, key)
         if len(teachers) > 1:
@@ -197,6 +175,7 @@ async def _probe_schedule(
         schedule = api.parse_schedule(payload, group_id)
         print(f"{OK if schedule.days else FAIL} JSON-API: {len(schedule.days)} дней")
         _print_schedule(schedule)
+        problems += _check_subgroups(schedule, "JSON-API")
         _dump(dump, f"api_events_{lang}.json", payload)
         problems += 0 if schedule.days else 1
         if subjects is not None and schedule.days:
@@ -211,12 +190,40 @@ async def _probe_schedule(
         schedule = scraper.parse_schedule_html(html, group_id, monday.year)
         print(f"{OK if schedule.days else FAIL} HTML: {len(schedule.days)} дней")
         _print_schedule(schedule)
+        _check_subgroups(schedule, "HTML")
         _dump(dump, f"week_page_{lang}.html", html)
         if subjects is not None and lang not in subjects and schedule.days:
             subjects[lang] = _subject_names(schedule)
     except TimetableError as error:
         print(f"{FAIL} HTML недоступен: {error}")
     return problems
+
+
+def _check_subgroups(schedule, source: str) -> int:
+    """Доходят ли до бота метки подгрупп.
+
+    Самая дорогая поломка была именно тут: HTML метку отдавал, а разбор
+    JSON-API её терял, и фильтр по когортам молча переставал работать —
+    студент второй подгруппы видел пары первой.
+    """
+    marked = [
+        event
+        for day in schedule.days
+        for event in day.events
+        if event.subgroup
+    ]
+    if marked:
+        labels = sorted({event.subgroup for event in marked})
+        print(f"   {OK} {source}: пар с пометкой подгруппы {len(marked)} — {labels}")
+        return 0
+    if not any(day.events for day in schedule.days):
+        return 0
+    print(
+        f"   {FAIL} {source}: ни у одной пары нет пометки подгруппы."
+        " Либо на этой неделе делённых занятий нет, либо разбор её теряет —"
+        " тогда фильтр по когортам не работает."
+    )
+    return 0  # не считаем ошибкой: неделя может быть без делённых пар
 
 
 def _subject_names(schedule) -> list[str]:

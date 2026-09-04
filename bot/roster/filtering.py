@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import date
 
 from ..timetable.models import Day, Event, Schedule
 from . import Roster, Student, Subject
@@ -102,15 +101,8 @@ def matching_subjects(text: str, roster: Roster) -> list[Subject]:
     return narrowed or matched
 
 
-def belongs_to(
-    event: Event, student: Student, roster: Roster, subgroup: str = ""
-) -> tuple[bool, str]:
-    """Показывать ли занятие. Второе значение — причина, если скрываем.
-
-    ``subgroup`` — номер подгруппы с сайта, который студент указал сам. Он
-    нужен там, где ведомость деканата не позволяет вычислить группу: см.
-    `_check_educator`.
-    """
+def belongs_to(event: Event, student: Student, roster: Roster) -> tuple[bool, str]:
+    """Показывать ли занятие. Второе значение — причина, если скрываем."""
     subjects = matching_subjects(event.subject, roster)
     if not subjects:
         return True, ""
@@ -122,9 +114,7 @@ def belongs_to(
             continue
 
         if subject.kind == "educator":
-            verdict = _check_educator(
-                text, event.educators, mine, subject, roster, subgroup
-            )
+            verdict = _check_educator(text, event.educators, mine, subject, roster)
         else:
             verdict = _check_number(text, mine, subject, roster)
 
@@ -156,14 +146,10 @@ def _check_number(text: str, mine: str, subject: Subject, roster: Roster) -> boo
 
 
 def _check_educator(
-    text: str,
-    educators: str,
-    mine: str,
-    subject: Subject,
-    roster: Roster,
-    subgroup: str = "",
+    text: str, educators: str, mine: str, subject: Subject, roster: Roster
 ) -> bool | None:
     my_surname = _surname(mine)
+    my_number = _value_number(mine)
     if not _mentions_surname(educators, my_surname):
         others = {
             _surname(value)
@@ -174,21 +160,15 @@ def _check_educator(
             return False
         return None
 
-    # Преподаватель мой. Дальше — какая из его групп, если групп несколько.
-    #
-    # Номер в ведомости («Shevchuk 2») нумерует группы внутри преподавателя, а
-    # «Подгруппа N» на сайте — подгруппы всего потока: у одного преподавателя
-    # это могут быть, скажем, вторая и четвёртая. Сравнивать эти нумерации
-    # нельзя — так «Shevchuk 2» попадал на пары первой группы. Поэтому номер
-    # из ведомости здесь не используется совсем: либо студент указал свою
-    # подгруппу по сайту, либо показываем все пары своего преподавателя.
-    pinned = _value_number(subgroup)
-    if pinned is None:
+    # Преподаватель мой. Если у него несколько групп, проверяем номер: у MPS I
+    # «Подгруппа 1» на сайте — это и есть «Shevchuk 1» из ведомости деканата,
+    # нумерация сквозная в пределах преподавателя.
+    if my_number is None:
         return True
     mentioned = _numbers(text)
     if not mentioned:
-        return True
-    return pinned in mentioned
+        return None
+    return True if my_number in mentioned else False
 
 
 def _subject_values(subject: Subject, roster: Roster) -> set[str]:
@@ -199,42 +179,8 @@ def _subject_values(subject: Subject, roster: Roster) -> set[str]:
     }
 
 
-def educator_value(student: Student, roster: Roster) -> str:
-    """Что стоит у студента в ведомости там, где группу задаёт преподаватель.
-
-    Например «Shevchuk 2» для MPS I. Пусто — таких предметов у студента нет.
-    """
-    for subject in roster.subjects:
-        if subject.kind == "educator" and student.cohorts.get(subject.key):
-            return student.cohorts[subject.key]
-    return ""
-
-
-def educator_subgroups(
-    schedule: Schedule, student: Student, roster: Roster
-) -> dict[int, list[tuple[date | None, Event]]]:
-    """Подгруппы преподавателя студента — по номерам с сайта.
-
-    Нужна, чтобы спросить студента, какая из них его: по ведомости это не
-    вычисляется. Возвращает номер подгруппы и занятия с датами — по времени
-    занятий студент и узнает свою группу.
-    """
-    found: dict[int, list[tuple[date | None, Event]]] = {}
-    for day in schedule.days:
-        for event in day.events:
-            for subject in matching_subjects(event.subject, roster):
-                if subject.kind != "educator":
-                    continue
-                mine = student.cohorts.get(subject.key, "")
-                if not mine or not _mentions_surname(event.educators, _surname(mine)):
-                    continue
-                for number in _numbers(marker_text(event)):
-                    found.setdefault(number, []).append((day.date, event))
-    return dict(sorted(found.items()))
-
-
 def filter_schedule(
-    schedule: Schedule, student: Student, roster: Roster, subgroup: str = ""
+    schedule: Schedule, student: Student, roster: Roster
 ) -> tuple[Schedule, FilterReport]:
     """Оставляет в расписании занятия, относящиеся к когортам студента."""
     report = FilterReport()
@@ -242,7 +188,7 @@ def filter_schedule(
     for day in schedule.days:
         kept: list[Event] = []
         for event in day.events:
-            visible, reason = belongs_to(event, student, roster, subgroup)
+            visible, reason = belongs_to(event, student, roster)
             if visible:
                 kept.append(event)
             else:

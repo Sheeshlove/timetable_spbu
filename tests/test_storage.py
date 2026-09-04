@@ -30,11 +30,6 @@ async def test_save_is_idempotent_upsert(storage):
     assert saved.student_name == "Morozov Ilia"
 
 
-async def test_subgroup_survives(storage):
-    await storage.save_subscription(make(subgroup="4"))
-    assert (await storage.get_subscription(1)).subgroup == "4"
-
-
 async def test_show_all_flag_survives(storage):
     await storage.save_subscription(make(show_all=True))
     assert (await storage.get_subscription(1)).show_all is True

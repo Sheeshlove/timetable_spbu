@@ -74,23 +74,6 @@ def course_teacher_keyboard(teachers: list[str], t: Translator) -> InlineKeyboar
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def subgroup_keyboard(numbers: list[int], t: Translator) -> InlineKeyboardMarkup:
-    """Подгруппы преподавателя — номера берутся из живого расписания."""
-    rows = [
-        [
-            InlineKeyboardButton(
-                text=t("subgroup_label", number=number),
-                callback_data=f"subgroup:{number}",
-            )
-        ]
-        for number in numbers
-    ]
-    rows.append(
-        [InlineKeyboardButton(text=t("btn_subgroup_all"), callback_data="subgroup:all")]
-    )
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
 def students_keyboard(labels: list[str], t: Translator) -> InlineKeyboardMarkup:
     """Кандидаты по фамилии: один вариант — одна кнопка."""
     rows = [
@@ -149,10 +132,7 @@ def time_keyboard(current_hour: int | None = None) -> InlineKeyboardMarkup:
 
 
 def settings_keyboard(
-    t: Translator,
-    show_all: bool = False,
-    notify_changes: bool = True,
-    with_subgroup: bool = False,
+    t: Translator, show_all: bool = False, notify_changes: bool = True
 ) -> InlineKeyboardMarkup:
     filter_title = t("btn_settings_show_mine") if show_all else t("btn_settings_show_all")
     notify_title = (
@@ -170,18 +150,6 @@ def settings_keyboard(
                     callback_data="settings:course",
                 )
             ],
-            *(
-                [
-                    [
-                        InlineKeyboardButton(
-                            text=t("btn_settings_subgroup"),
-                            callback_data="settings:subgroup",
-                        )
-                    ]
-                ]
-                if with_subgroup
-                else []
-            ),
             [
                 InlineKeyboardButton(
                     text=t("btn_settings_student"), callback_data="settings:student"

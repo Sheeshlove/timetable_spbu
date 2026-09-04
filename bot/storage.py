@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     lang         TEXT    NOT NULL DEFAULT 'ru',
     language_course  TEXT NOT NULL DEFAULT '',
     language_teacher TEXT NOT NULL DEFAULT '',
-    subgroup     TEXT    NOT NULL DEFAULT '',
     show_all     INTEGER NOT NULL DEFAULT 0,
     notify_changes INTEGER NOT NULL DEFAULT 1,
     next_check_at  TEXT,
@@ -62,7 +61,6 @@ LATER_COLUMNS = {
     "lang": "lang TEXT NOT NULL DEFAULT 'ru'",
     "language_course": "language_course TEXT NOT NULL DEFAULT ''",
     "language_teacher": "language_teacher TEXT NOT NULL DEFAULT ''",
-    "subgroup": "subgroup TEXT NOT NULL DEFAULT ''",
     "notify_changes": "notify_changes INTEGER NOT NULL DEFAULT 1",
     "next_check_at": "next_check_at TEXT",
 }
@@ -96,8 +94,6 @@ class Subscription:
     # Изучаемый иностранный язык и, если групп несколько, преподаватель
     language_course: str = ""
     language_teacher: str = ""
-    # Подгруппа с сайта («Подгруппа 2») — там, где по ведомости не вычислить
-    subgroup: str = ""
     show_all: bool = False
     # Уведомлять ли об изменениях в расписании и когда проверять в следующий раз
     notify_changes: bool = True
@@ -116,7 +112,6 @@ class Subscription:
             lang=row["lang"],
             language_course=row["language_course"],
             language_teacher=row["language_teacher"],
-            subgroup=row["subgroup"],
             show_all=bool(row["show_all"]),
             notify_changes=bool(row["notify_changes"]),
             next_check_at=_parse(row["next_check_at"]),
@@ -244,16 +239,15 @@ class Storage:
             """
             INSERT INTO subscriptions (
                 user_id, chat_id, student_name, lang, language_course, language_teacher,
-                subgroup, show_all, notify_changes, next_check_at, frequency, send_hour,
+                show_all, notify_changes, next_check_at, frequency, send_hour,
                 send_minute, next_run_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 chat_id          = excluded.chat_id,
                 student_name     = excluded.student_name,
                 lang             = excluded.lang,
                 language_course  = excluded.language_course,
                 language_teacher = excluded.language_teacher,
-                subgroup         = excluded.subgroup,
                 show_all         = excluded.show_all,
                 notify_changes   = excluded.notify_changes,
                 next_check_at    = excluded.next_check_at,
@@ -270,7 +264,6 @@ class Storage:
                 subscription.lang,
                 subscription.language_course,
                 subscription.language_teacher,
-                subscription.subgroup,
                 int(subscription.show_all),
                 int(subscription.notify_changes),
                 _iso(subscription.next_check_at),

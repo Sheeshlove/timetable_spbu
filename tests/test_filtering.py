@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from bot.roster import load_roster
-from bot.roster.filtering import belongs_to, educator_subgroups, filter_schedule
+from bot.roster.filtering import belongs_to, filter_schedule
 from bot.timetable.models import Day, Event, Schedule
 
 roster = load_roster()
@@ -13,9 +13,8 @@ roster = load_roster()
 ME = roster.get("Shishlov Egor")
 
 
-def visible(subject: str, educators: str = "", subgroup: str = "") -> bool:
-    event = Event(subject=subject, educators=educators)
-    return belongs_to(event, ME, roster, subgroup)[0]
+def visible(subject: str, educators: str = "") -> bool:
+    return belongs_to(Event(subject=subject, educators=educators), ME, roster)[0]
 
 
 def test_fixture_student_has_expected_cohorts():
@@ -85,68 +84,12 @@ def test_educator_split_is_matched_across_alphabets():
     assert visible("MPS I", "Shevchuk D.") is True
 
 
-def test_deanery_number_is_not_a_site_subgroup_number():
-    """«Shevchuk 2» — вторая группа преподавателя, а не «Подгруппа 2» сайта.
-
-    Нумерации разные: у одного преподавателя на сайте могут стоять, скажем,
-    вторая и четвёртая подгруппы потока. Сравнивать их нельзя — раньше из-за
-    этого студенты Shevchuk 2 попадали на пары первой группы. Пока студент не
-    указал подгруппу сам, показываем все пары своего преподавателя.
-    """
-    assert visible("MPS I, подгруппа 1", "Шевчук Дмитрий") is True
+def test_educator_group_number_is_checked():
+    """«Подгруппа 1» на сайте = «Shevchuk 1» в ведомости — номера совпадают."""
     assert visible("MPS I, подгруппа 2", "Шевчук Дмитрий") is True
-    assert visible("MPS I, подгруппа 4", "Шевчук Дмитрий") is True
-    # Чужой преподаватель по-прежнему скрывается — тут ведомость надёжна.
-    assert visible("MPS I, подгруппа 2", "Замулин А.") is False
-
-
-def test_chosen_subgroup_narrows_to_one_group():
-    """Студент указал подгруппу по сайту — остаётся только она."""
-    assert visible("MPS I, подгруппа 4", "Шевчук Дмитрий", subgroup="4") is True
-    assert visible("MPS I, подгруппа 2", "Шевчук Дмитрий", subgroup="4") is False
-    # Пара без номера подгруппы остаётся: скрываем только заведомо чужое.
-    assert visible("MPS I", "Шевчук Дмитрий", subgroup="4") is True
-
-
-def test_chosen_subgroup_does_not_touch_other_subjects():
-    """Выбор касается только предмета, где группу задаёт преподаватель."""
-    assert visible("QMBR seminar Coh.4", subgroup="2") is True
-    assert visible("Research Seminar I, группа 1", subgroup="2") is True
-
-
-def test_educator_subgroups_are_collected_for_the_question():
-    schedule = Schedule(
-        group_id=1,
-        group_name="MiM",
-        days=[
-            Day(
-                date=date(2026, 9, 19),
-                title="",
-                events=[
-                    Event(
-                        subject="Профессиональные навыки менеджера I, практическое занятие",
-                        subgroup="Подгруппа 2",
-                        educators="Шевчук Е. В.",
-                        time_text="10:00–11:30",
-                    ),
-                    Event(
-                        subject="Профессиональные навыки менеджера I, практическое занятие",
-                        subgroup="Подгруппа 4",
-                        educators="Шевчук Е. В.",
-                        time_text="14:00–15:30",
-                    ),
-                    Event(
-                        subject="Профессиональные навыки менеджера I, практическое занятие",
-                        subgroup="Подгруппа 1",
-                        educators="Замулин А. Л.",
-                        time_text="10:00–11:30",
-                    ),
-                ],
-            )
-        ],
-    )
-    found = educator_subgroups(schedule, ME, roster)
-    assert sorted(found) == [2, 4], "чужой преподаватель в выбор не попадает"
+    assert visible("MPS I, подгруппа 1", "Шевчук Дмитрий") is False
+    assert visible("MPS I, группа 2", "Шевчук Дмитрий") is True
+    assert visible("MPS I, группа 1", "Шевчук Дмитрий") is False
 
 
 def test_unknown_educator_keeps_event():
