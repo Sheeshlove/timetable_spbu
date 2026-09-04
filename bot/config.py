@@ -34,6 +34,8 @@ class Settings:
     division_alias: str
     program_title: str
     roster_path: Path | None = None
+    # Прокси до api.telegram.org: с части хостингов Telegram недоступен напрямую
+    telegram_proxy: str = ""
     # Как часто проверять расписание на изменения и на сколько дней вперёд
     change_check_hours: float = 3.0
     change_window_days: int = 14
@@ -64,6 +66,7 @@ def load_settings() -> Settings:
         division_alias=os.environ.get("DIVISION_ALIAS", "GSOM"),
         program_title=os.environ.get("PROGRAM_TITLE", "Master in Management, 2026"),
         roster_path=Path(os.environ["ROSTER_PATH"]) if os.environ.get("ROSTER_PATH") else None,
+        telegram_proxy=os.environ.get("TELEGRAM_PROXY", "").strip(),
         change_check_hours=float(os.environ.get("CHANGE_CHECK_HOURS", "3")),
         change_window_days=int(os.environ.get("CHANGE_WINDOW_DAYS", "14")),
     )

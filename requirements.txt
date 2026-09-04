@@ -3,3 +3,5 @@ aiohttp>=3.9
 aiosqlite>=0.20
 beautifulsoup4>=4.12
 lxml>=5.0
+# нужен, только если задан TELEGRAM_PROXY (Telegram через прокси)
+aiohttp-socks>=0.9
