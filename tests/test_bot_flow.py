@@ -80,6 +80,49 @@ class StubTimetable:
         )
 
 
+class MpsTimetable(StubTimetable):
+    """Сайт, где у Шевчука две подгруппы потока — вторая и четвёртая.
+
+    Ведомость деканата при этом знает только «Shevchuk 1» и «Shevchuk 2»:
+    номера не совпадают, и вычислить группу по ней нельзя.
+    """
+
+    async def schedule(self, group_id, start, end, alias=None, lang="ru"):
+        self.schedule_calls.append((group_id, start, end))
+        self.languages.append(lang)
+        mps = "Профессиональные навыки менеджера I, практическое занятие"
+        return Schedule(
+            group_id=group_id,
+            group_name="MiM 2026",
+            days=[
+                Day(
+                    date=start,
+                    title="",
+                    events=[
+                        Event(
+                            subject=mps,
+                            subgroup="Подгруппа 2",
+                            educators="Шевчук Е. В.",
+                            time_text="10:00–11:30",
+                        ),
+                        Event(
+                            subject=mps,
+                            subgroup="Подгруппа 4",
+                            educators="Шевчук Е. В.",
+                            time_text="14:00–15:30",
+                        ),
+                        Event(
+                            subject=mps,
+                            subgroup="Подгруппа 1",
+                            educators="Замулин А. Л.",
+                            time_text="10:00–11:30",
+                        ),
+                    ],
+                )
+            ],
+        )
+
+
 @pytest.fixture(scope="module")
 def dispatcher():
     """Роутеры aiogram привязываются к одному Dispatcher, поэтому он общий;
@@ -266,6 +309,89 @@ async def test_cohorts_command(app):
     await telegram.send("/cohorts")
     text = telegram.session.texts[-1]
     assert "Количественные методы, семинары" in text and "Coh.4" in text
+
+
+# --- Подгруппа у преподавателя ----------------------------------------
+
+
+async def setup_with_mps(telegram, subgroup: str) -> None:
+    """Знакомство на сайте, где у преподавателя две подгруппы."""
+    telegram.dispatcher["client"] = MpsTimetable()
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    await telegram.send("Шишлов")
+    await telegram.click_button("Это я")
+    await telegram.click_button("Показывать все")  # иностранный язык
+    await telegram.click_button(subgroup)
+    await telegram.click_button("Раз в день")
+    await telegram.click_button("08:00")
+
+
+async def test_setup_asks_which_subgroup_is_mine(app):
+    telegram, storage, _ = app
+    telegram.dispatcher["client"] = MpsTimetable()
+    await telegram.send("/start")
+    await telegram.click_button("Русский")
+    await telegram.send("Шишлов")
+    await telegram.click_button("Это я")
+    await telegram.click_button("Показывать все")
+
+    question = telegram.session.texts[-1]
+    assert "несколько подгрупп" in question
+    assert "Shevchuk 2" in question, "видно, что стоит в ведомости"
+    assert "10:00" in question and "14:00" in question, "по времени и узнают свою"
+    labels = list(telegram.session.buttons())
+    assert "Подгруппа 2" in labels and "Подгруппа 4" in labels
+
+    await telegram.click_button("Подгруппа 4")
+    assert (await storage.get_subscription(777)).subgroup == "4"
+
+
+async def test_chosen_subgroup_leaves_only_it(app):
+    telegram, _, _ = app
+    await setup_with_mps(telegram, "Подгруппа 4")
+    telegram.session.clear()
+
+    await telegram.send("/today")
+    text = telegram.session.texts[-1]
+    assert "Подгруппа 4" in text
+    assert "Подгруппа 2" not in text
+    assert "Замулин" not in text, "чужой преподаватель скрыт и без выбора"
+
+
+async def test_without_choice_both_groups_of_my_teacher_are_shown(app):
+    """Пока подгруппа не выбрана, лучше лишняя пара, чем пропущенная."""
+    telegram, storage, _ = app
+    await setup_with_mps(telegram, "Не знаю, показывать все")
+    assert (await storage.get_subscription(777)).subgroup == ""
+    telegram.session.clear()
+
+    await telegram.send("/today")
+    text = telegram.session.texts[-1]
+    assert "Подгруппа 2" in text and "Подгруппа 4" in text
+    assert "Замулин" not in text
+
+
+async def test_subgroup_can_be_changed_from_settings(app):
+    telegram, storage, _ = app
+    await setup_with_mps(telegram, "Подгруппа 4")
+
+    await telegram.send("/settings")
+    assert "Подгруппа 4" in telegram.session.texts[-1]
+    await telegram.click_button("Моя подгруппа")
+    await telegram.click_button("Подгруппа 2")
+
+    assert (await storage.get_subscription(777)).subgroup == "2"
+    assert "Подгруппа 2" in telegram.session.texts[-1]
+
+
+async def test_no_subgroup_question_when_there_is_nothing_to_choose(app):
+    """У обычного расписания подгрупп преподавателя нет — и вопроса нет."""
+    telegram, storage, _ = app
+    await complete_setup(telegram)
+    saved = await storage.get_subscription(777)
+    assert saved.frequency == DAILY, "знакомство дошло до конца без лишних шагов"
+    assert saved.subgroup == ""
 
 
 # --- Настройки ---------------------------------------------------------

@@ -28,7 +28,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bot.languages import detect_language, language_name, teachers_for  # noqa: E402
 from bot.roster import load_roster  # noqa: E402
-from bot.roster.filtering import belongs_to, marker_text, matching_subjects  # noqa: E402
+from bot.roster.filtering import (  # noqa: E402
+    belongs_to,
+    educator_subgroups,
+    educator_value,
+    marker_text,
+    matching_subjects,
+)
 from bot.timetable import api, scraper  # noqa: E402
 from bot.timetable.client import TimetableClient, TimetableError  # noqa: E402
 
@@ -111,6 +117,22 @@ async def _probe_student(
                         "            ⚠ у пары нет пометки потока, а в ведомости"
                         f" номер есть ({mine}) — различить подгруппы нечем"
                     )
+
+    # Подгруппы преподавателя: по ведомости («Shevchuk 2») их не различить,
+    # потому что сайт нумерует подгруппы по всему потоку. Показываем, какие
+    # номера вообще есть у преподавателя студента — это и предлагает бот.
+    groups = educator_subgroups(schedule, student, roster)
+    if groups:
+        print(f"\n   Подгруппы преподавателя (в ведомости: {educator_value(student, roster)!r}):")
+        for number, entries in groups.items():
+            when = ", ".join(
+                dict.fromkeys(
+                    f"{day} {event.interval}" for day, event in entries[:3]
+                )
+            )
+            print(f"     Подгруппа {number}: {when}")
+        if len(groups) > 1:
+            print("     ⚠ выбрать свою студент должен сам — «⚙️ Настройки» → «Моя подгруппа»")
 
     for key in ("de", "fr", "es", "en", "ru_foreign"):
         teachers = teachers_for(schedule, key)
