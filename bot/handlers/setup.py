@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from html import escape
 
 from aiogram import F, Router
@@ -24,6 +25,7 @@ from ..keyboards import (
     language_keyboard,
     main_menu,
     students_keyboard,
+    subgroup_keyboard,
     time_keyboard,
 )
 from ..languages import (
@@ -35,6 +37,7 @@ from ..languages import (
     teachers_for,
 )
 from ..roster import Roster, Student
+from ..roster.filtering import educator_subgroups, educator_value
 from ..scheduling import OFF, next_run_at
 from ..storage import Storage, Subscription
 from ..timetable import TimetableClient, TimetableError
@@ -48,6 +51,7 @@ class SetupStates(StatesGroup):
     last_name = State()
     course_language = State()
     course_teacher = State()
+    subgroup = State()
     frequency = State()
     send_time = State()
 
@@ -320,7 +324,8 @@ async def on_course_language(
         await storage.save_subscription(subscription)
         await callback.message.answer(t("course_language_all"))
         await _after_course(
-            callback.message, state, storage, settings, roster, t, callback.from_user.id
+            callback.message, state, storage, settings, client, roster, t,
+            callback.from_user.id,
         )
         return
 
@@ -330,7 +335,8 @@ async def on_course_language(
         await storage.save_subscription(subscription)
         await callback.message.answer(t("course_language_none"))
         await _after_course(
-            callback.message, state, storage, settings, roster, t, callback.from_user.id
+            callback.message, state, storage, settings, client, roster, t,
+            callback.from_user.id,
         )
         return
 
@@ -357,8 +363,8 @@ async def on_course_language(
         t("course_language_saved", course=escape(language_name(choice, t.lang)))
     )
     await _after_course(
-            callback.message, state, storage, settings, roster, t, callback.from_user.id
-        )
+        callback.message, state, storage, settings, client, roster, t, callback.from_user.id
+    )
 
 
 @router.callback_query(F.data.startswith("teacher:"))
@@ -367,6 +373,7 @@ async def on_course_teacher(
     state: FSMContext,
     storage: Storage,
     settings: Settings,
+    client: TimetableClient,
     roster: Roster,
     t: Translator,
 ) -> None:
@@ -393,8 +400,8 @@ async def on_course_teacher(
         title = f"{title} · {teacher}"
     await callback.message.answer(t("course_language_saved", course=escape(title)))
     await _after_course(
-            callback.message, state, storage, settings, roster, t, callback.from_user.id
-        )
+        callback.message, state, storage, settings, client, roster, t, callback.from_user.id
+    )
 
 
 async def _after_course(
@@ -402,6 +409,7 @@ async def _after_course(
     state: FSMContext,
     storage: Storage,
     settings: Settings,
+    client: TimetableClient,
     roster: Roster,
     t: Translator,
     user_id: int,
@@ -414,7 +422,122 @@ async def _after_course(
         if subscription is not None:
             await message.answer(format_subscription(subscription, settings, roster, t))
         return
+    if await ask_subgroup(message, state, subscription, settings, client, roster, t):
+        return
     await ask_frequency(message, state, subscription, t)
+
+
+# --- Подгруппа у преподавателя ----------------------------------------
+
+
+def _subgroup_when(entries, t: Translator) -> str:
+    """Когда занимается эта подгруппа — «суббота 10:00, 11:45»."""
+    labels: list[str] = []
+    for day, event in entries:
+        weekday = t.weekdays[day.weekday()] if day else ""
+        start = re.split(r"[–—-]", event.interval or "", maxsplit=1)[0].strip()
+        label = " ".join(part for part in (weekday, start) if part)
+        if label and label not in labels:
+            labels.append(label)
+        if len(labels) == 3:  # трёх примеров хватает, чтобы узнать свою пару
+            break
+    return ", ".join(labels)
+
+
+async def ask_subgroup(
+    message: Message,
+    state: FSMContext,
+    subscription: Subscription | None,
+    settings: Settings,
+    client: TimetableClient,
+    roster: Roster,
+    t: Translator,
+    *,
+    forced: bool = False,
+) -> bool:
+    """Спрашивает подгруппу, если по ведомости её не определить.
+
+    В ведомости деканата группы преподавателя пронумерованы внутри него
+    («Shevchuk 1», «Shevchuk 2»), а на сайте подгруппы нумеруются по всему
+    потоку. Сопоставить одно с другим нельзя, поэтому спрашиваем студента —
+    но только когда выбор действительно есть. Возвращает True, если спросили.
+    """
+    student = (
+        roster.get(subscription.student_name)
+        if subscription and subscription.student_name
+        else None
+    )
+    if student is None or subscription.show_all:
+        return False
+
+    try:
+        schedule = await _upcoming_week(settings, client, t.lang)
+    except TimetableError as error:
+        logger.info("Подгруппы с сайта не получены: %s", error)
+        if forced:
+            await message.answer(t("subgroup_unknown"))
+        return False
+
+    groups = educator_subgroups(schedule, student, roster)
+    if len(groups) < 2:
+        if forced:
+            await message.answer(t("subgroup_single"))
+        return False
+
+    first = next(iter(groups.values()))[0][1]
+    cohort = educator_value(student, roster)
+    lines = [t("ask_subgroup", educator=escape(first.educators), cohort=escape(cohort))]
+    for number, entries in groups.items():
+        lines.append(
+            t(
+                "subgroup_option",
+                label=t("subgroup_label", number=number),
+                when=escape(_subgroup_when(entries, t)),
+            )
+        )
+
+    await state.set_state(SetupStates.subgroup)
+    await message.answer(
+        "\n".join(lines), reply_markup=subgroup_keyboard(list(groups), t)
+    )
+    return True
+
+
+@router.callback_query(F.data.startswith("subgroup:"))
+async def on_subgroup(
+    callback: CallbackQuery,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    roster: Roster,
+    t: Translator,
+) -> None:
+    choice = callback.data.split(":", 1)[1]
+    await callback.answer()
+
+    subscription = await storage.get_subscription(callback.from_user.id)
+    if subscription is None:
+        await callback.message.answer(t("not_configured"))
+        return
+
+    subscription.subgroup = "" if choice == "all" else choice
+    await storage.save_subscription(subscription)
+
+    if subscription.subgroup:
+        await callback.message.answer(
+            t("subgroup_saved", subgroup=t("subgroup_label", number=subscription.subgroup))
+        )
+    else:
+        await callback.message.answer(t("subgroup_all_saved"))
+
+    data = await state.get_data()
+    if data.get("editing_subgroup"):
+        await state.clear()
+        await callback.message.answer(
+            format_subscription(subscription, settings, roster, t)
+        )
+        return
+    await ask_frequency(callback.message, state, subscription, t)
 
 
 @router.callback_query(F.data == "settings:course")
@@ -429,6 +552,30 @@ async def change_course_language(
     await state.clear()
     await state.update_data(editing_course=True)
     await ask_course_language(callback.message, state, settings, client, t)
+
+
+@router.callback_query(F.data == "settings:subgroup")
+async def change_subgroup(
+    callback: CallbackQuery,
+    state: FSMContext,
+    storage: Storage,
+    settings: Settings,
+    client: TimetableClient,
+    roster: Roster,
+    t: Translator,
+) -> None:
+    subscription = await storage.get_subscription(callback.from_user.id)
+    if subscription is None:
+        await callback.answer(t("setup_first"), show_alert=True)
+        return
+    await callback.answer()
+    await state.clear()
+    await state.update_data(editing_subgroup=True)
+    asked = await ask_subgroup(
+        callback.message, state, subscription, settings, client, roster, t, forced=True
+    )
+    if not asked:
+        await state.clear()
 
 
 # --- Периодичность и время --------------------------------------------

@@ -23,7 +23,7 @@ from ..i18n import TEXTS, Translator
 from ..languages import filter_events
 from ..keyboards import frequency_keyboard, settings_keyboard, time_keyboard
 from ..roster import Roster
-from ..roster.filtering import filter_schedule
+from ..roster.filtering import educator_value, filter_schedule
 from ..storage import Storage, Subscription
 from ..timetable import Schedule, TimetableClient, TimetableError
 from ..timetable.models import Day
@@ -54,7 +54,9 @@ def apply_cohorts(
             logger.info("Студент %s не найден в списке", subscription.student_name)
             notes.append(t("not_in_roster"))
         else:
-            schedule, report = filter_schedule(schedule, student, roster)
+            schedule, report = filter_schedule(
+                schedule, student, roster, subscription.subgroup
+            )
             if report.hidden:
                 notes.append(t("hidden_note", count=report.hidden))
 
@@ -63,6 +65,18 @@ def apply_cohorts(
         notes.append(t("hidden_language_note", count=hidden_languages))
 
     return schedule, " ".join(notes)
+
+
+def show_subgroup_button(subscription: Subscription, roster: Roster) -> bool:
+    """Есть ли смысл в пункте «Моя подгруппа».
+
+    Он нужен там, где группу задаёт преподаватель: по ведомости она не
+    вычисляется, а на сайте подгрупп у преподавателя может быть несколько.
+    """
+    if subscription.show_all or not subscription.student_name:
+        return False
+    student = roster.get(subscription.student_name)
+    return bool(student and educator_value(student, roster))
 
 
 def _apply_language(schedule: Schedule, subscription: Subscription) -> tuple[Schedule, int]:
@@ -230,7 +244,10 @@ async def cmd_settings(
     await message.answer(
         format_subscription(subscription, settings, roster, t),
         reply_markup=settings_keyboard(
-            t, subscription.show_all, subscription.notify_changes
+            t,
+            subscription.show_all,
+            subscription.notify_changes,
+            show_subgroup_button(subscription, roster),
         ),
     )
 
@@ -292,7 +309,10 @@ async def on_settings_filter(
     await callback.message.edit_text(
         format_subscription(subscription, settings, roster, t),
         reply_markup=settings_keyboard(
-            t, subscription.show_all, subscription.notify_changes
+            t,
+            subscription.show_all,
+            subscription.notify_changes,
+            show_subgroup_button(subscription, roster),
         ),
     )
 
@@ -322,7 +342,10 @@ async def on_settings_notify(
     await callback.message.edit_text(
         format_subscription(subscription, settings, roster, t),
         reply_markup=settings_keyboard(
-            t, subscription.show_all, subscription.notify_changes
+            t,
+            subscription.show_all,
+            subscription.notify_changes,
+            show_subgroup_button(subscription, roster),
         ),
     )
 

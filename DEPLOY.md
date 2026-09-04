@@ -363,7 +363,7 @@ cd /opt/timetable_spbu
 sudo -u timetable /opt/timetable_spbu/.venv/bin/python -m pytest -q
 ```
 
-Ожидается `269 passed`.
+Ожидается `278 passed`.
 
 ### Пробный запуск руками
 
@@ -631,6 +631,7 @@ journalctl -u timetable-bot -n 100 --no-pager
 | `probe_site.py` показывает `❌` у всех источников | Сайт сменил вёрстку или адреса | `python scripts/probe_site.py --dump tests/fixtures`, дальше правится `bot/timetable/api.py` или `scraper.py` |
 | Бот не нашёл фамилию студента | Его нет в `bot/roster/mim_2026.json` | Сверьте написание с таблицей деканата и переимпортируйте список |
 | Пропали занятия, которые должны быть | Фильтр принял метку за чужую когорту | Студент включает «Показывать всё расписание» в настройках; чинится в `bot/roster/filtering.py` |
+| Показываются пары чужой подгруппы преподавателя | Подгруппа не выбрана: по ведомости её не вычислить | Студент выбирает её в «⚙️ Настройки» → «Моя подгруппа»; какие подгруппы есть, покажет `probe_site.py --student ФАМИЛИЯ` |
 | `sqlite3.OperationalError: unable to open database file` | Нет прав на каталог `data` | `chown -R timetable:timetable /opt/timetable_spbu/data` |
 | `sqlite3.OperationalError: attempt to write a readonly database` | `ProtectSystem=strict` без `ReadWritePaths` | Проверьте строку `ReadWritePaths` в юните, `systemctl daemon-reload && systemctl restart timetable-bot` |
 | Рассылка приходит не в то время | Часовой пояс или часы сервера | `timedatectl` и значение `TZ_NAME` в `.env` |
