@@ -11,12 +11,32 @@ camelCase.
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import date, datetime
 from typing import Any, Iterable
 
 from .models import Day, Event, Schedule
 
 EVENTS_PATH = "/api/v1/groups/{group_id}/events/{start}/{end}"
+
+# Метка подгруппы: «Подгруппа 2», «Subgroup 2», иногда внутри строки вида
+# «26.М01-вшм (Подгруппа 2)».
+SUBGROUP_RE = re.compile(r"(?:подгруппа|sub-?group)\s*[-–—:]?\s*\d+", re.I)
+
+# Где API прячет подгруппу. Имена разные у разных эндпоинтов, поэтому
+# перебираем известные, а если не нашли — ищем метку по всей записи: без
+# подгруппы фильтр по когортам не работает вовсе.
+SUBGROUP_KEYS = (
+    "ContingentUnitsDisplayTest",
+    "ContingentUnitsDisplayText",
+    "ContingentUnitName",
+    "ContingentUnitNames",
+    "SubGroupName",
+    "SubGroup",
+    "StudentGroupDivisionName",
+    "DivisionAndCourse",
+)
 
 
 def _get(data: Any, *names: str, default: Any = None) -> Any:
@@ -56,6 +76,37 @@ def _parse_dt(value: Any) -> datetime | None:
     return None
 
 
+def _subgroup(item: Any) -> str:
+    """Метка подгруппы занятия — «Подгруппа 2».
+
+    Без неё бот не отличит первую подгруппу от второй, поэтому ищем упорно:
+    сперва в известных полях, потом по всей записи целиком.
+    """
+    for key in SUBGROUP_KEYS:
+        found = SUBGROUP_RE.search(_flatten(_get(item, key)))
+        if found:
+            return found.group(0).strip()
+    try:
+        whole = json.dumps(item, ensure_ascii=False)
+    except (TypeError, ValueError):  # pragma: no cover — на всякий случай
+        whole = str(item)
+    found = SUBGROUP_RE.search(whole)
+    return found.group(0).strip() if found else ""
+
+
+def _flatten(value: Any) -> str:
+    """Строка из значения любой вложенности: API отдаёт и списки списков."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple)):
+        return " ".join(_flatten(item) for item in value)
+    if isinstance(value, dict):
+        return " ".join(_flatten(item) for item in value.values())
+    return str(value)
+
+
 def _parse_event(item: Any) -> Event | None:
     subject = _text(
         _get(item, "Subject", "SubjectName", "DisplayName", "StudyEventsTimeTableKindCode")
@@ -69,6 +120,7 @@ def _parse_event(item: Any) -> Event | None:
         time_text=_text(_get(item, "TimeIntervalString", "TimeInterval")),
         locations=_text(_get(item, "LocationsDisplayText", "Locations", "Location")),
         educators=_text(_get(item, "EducatorsDisplayText", "Educators", "Educator")),
+        subgroup=_subgroup(item),
         is_canceled=bool(_get(item, "IsCanceled", "Cancelled", default=False)),
     )
 

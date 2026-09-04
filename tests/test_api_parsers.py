@@ -80,3 +80,78 @@ def test_merge_schedules_dedupes_days():
     merged = api.merge_schedules([first, first])
     assert len(merged.days) == 2
     assert [day.date for day in merged.days] == [date(2026, 8, 31), date(2026, 9, 1)]
+
+
+# --- Подгруппа ---------------------------------------------------------
+#
+# Без метки подгруппы фильтр по когортам не работает вовсе: студент второй
+# подгруппы видит пары первой. В HTML метка есть, а в JSON-API её раньше не
+# читали — из-за этого бот в бою не различал Shevchuk 1 и Shevchuk 2.
+
+
+def one_event(**fields) -> dict:
+    payload = {
+        "Days": [
+            {
+                "Day": "2026-09-19T00:00:00",
+                "DayStudyEvents": [
+                    {
+                        "Subject": "Профессиональные навыки менеджера I, практическое занятие",
+                        "TimeIntervalString": "10:00–11:30",
+                        "EducatorsDisplayText": "Шевчук Е. В.",
+                        **fields,
+                    }
+                ],
+            }
+        ]
+    }
+    return api.parse_schedule(payload, 474489).days[0].events[0]
+
+
+def test_subgroup_from_contingent_units():
+    event = one_event(ContingentUnitsDisplayTest="26.М01-вшм (Подгруппа 2)")
+    assert event.subgroup == "Подгруппа 2"
+
+
+def test_subgroup_from_nested_lists():
+    event = one_event(ContingentUnitNames=[["26.М01-вшм", "Подгруппа 1"]])
+    assert event.subgroup == "Подгруппа 1"
+
+
+def test_subgroup_from_english_api():
+    event = one_event(ContingentUnitName="26.М01-вшм (Subgroup 4)")
+    assert event.subgroup == "Subgroup 4"
+
+
+def test_subgroup_is_found_in_an_unexpected_field():
+    """Имена полей у эндпоинтов разные — метку ищем по всей записи."""
+    event = one_event(SomeNewFieldName="Подгруппа 3")
+    assert event.subgroup == "Подгруппа 3"
+
+
+def test_event_without_subgroup_stays_empty():
+    event = one_event(LocationsDisplayText="Волховский переулок, д. 3, лит. А,105")
+    assert event.subgroup == "", "номер аудитории — не подгруппа"
+
+
+def test_lecture_for_the_whole_stream_has_no_subgroup():
+    event = one_event(
+        Subject="Современный стратегический анализ, лекция",
+        ContingentUnitsDisplayTest="26.М01-вшм",
+    )
+    assert event.subgroup == ""
+
+
+def test_api_schedule_is_filtered_by_subgroup():
+    """Сквозная проверка: занятие из API доходит до фильтра с меткой."""
+    from bot.roster import load_roster
+    from bot.roster.filtering import belongs_to
+
+    roster = load_roster()
+    me = roster.get("Shishlov Egor")  # MPS I: Shevchuk 2
+    assert me.cohorts["mps_1"] == "Shevchuk 2"
+
+    mine = one_event(ContingentUnitsDisplayTest="26.М01-вшм (Подгруппа 2)")
+    other = one_event(ContingentUnitsDisplayTest="26.М01-вшм (Подгруппа 1)")
+    assert belongs_to(mine, me, roster)[0] is True
+    assert belongs_to(other, me, roster)[0] is False

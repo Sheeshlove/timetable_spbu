@@ -9,7 +9,6 @@ from .changes import Diff, Slot
 from .i18n import Translator
 from .languages import choice_title
 from .roster import Roster, Student
-from .roster.filtering import educator_value
 from .scheduling import DAILY, MONTHLY, OFF, WEEKLY
 from .storage import Note, Subscription
 from .timetable.models import Day, Schedule
@@ -145,17 +144,6 @@ def format_subscription(
                         subscription.language_teacher,
                         t.lang,
                     )
-                ),
-            )
-        )
-    if student and not subscription.show_all and educator_value(student, roster):
-        lines.append(
-            t(
-                "settings_subgroup",
-                value=(
-                    t("subgroup_label", number=subscription.subgroup)
-                    if subscription.subgroup
-                    else t("subgroup_any")
                 ),
             )
         )
