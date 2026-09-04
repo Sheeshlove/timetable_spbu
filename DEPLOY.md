@@ -204,6 +204,8 @@ TZ_NAME=Europe/Moscow
 TIMETABLE_BASE_URL=https://timetable.spbu.ru
 HTTP_CACHE_TTL=900
 HTTP_TIMEOUT=20
+CHANGE_CHECK_HOURS=3
+CHANGE_WINDOW_DAYS=14
 LOG_LEVEL=INFO
 ```
 
@@ -219,6 +221,8 @@ LOG_LEVEL=INFO
 | `TIMETABLE_BASE_URL` | Адрес сайта расписания |
 | `HTTP_CACHE_TTL` | Сколько секунд держать ответы сайта в кэше |
 | `HTTP_TIMEOUT` | Таймаут запроса к сайту, секунды |
+| `CHANGE_CHECK_HOURS` | Как часто сверять расписание с прошлым слепком (часы) |
+| `CHANGE_WINDOW_DAYS` | На сколько дней вперёд следить за изменениями |
 | `LOG_LEVEL` | `INFO` для обычной работы, `DEBUG` при разборе проблем |
 
 Идентификатор группы берётся из адреса расписания на сайте:
@@ -285,7 +289,7 @@ cd /opt/timetable_spbu
 sudo -u timetable /opt/timetable_spbu/.venv/bin/python -m pytest -q
 ```
 
-Ожидается `223 passed`.
+Ожидается `263 passed`.
 
 ### Пробный запуск руками
 

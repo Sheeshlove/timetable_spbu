@@ -131,11 +131,17 @@ def time_keyboard(current_hour: int | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def settings_keyboard(t: Translator, show_all: bool = False) -> InlineKeyboardMarkup:
+def settings_keyboard(
+    t: Translator, show_all: bool = False, notify_changes: bool = True
+) -> InlineKeyboardMarkup:
     filter_title = t("btn_settings_show_mine") if show_all else t("btn_settings_show_all")
+    notify_title = (
+        t("btn_settings_notify_off") if notify_changes else t("btn_settings_notify_on")
+    )
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=t("btn_settings_freq"), callback_data="settings:freq")],
+            [InlineKeyboardButton(text=notify_title, callback_data="settings:notify")],
             [InlineKeyboardButton(text=t("btn_settings_time"), callback_data="settings:time")],
             [InlineKeyboardButton(text=filter_title, callback_data="settings:filter")],
             [

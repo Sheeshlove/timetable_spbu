@@ -1,9 +1,10 @@
 """Хранилище: подписки и заметки."""
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 
+from bot.changes import Slot
 from bot.storage import Storage, Subscription, utcnow
 
 
@@ -96,3 +97,78 @@ async def test_data_survives_reconnect(storage, tmp_path):
     assert saved is not None and saved.frequency == "daily"
     await again.close()
     await storage.connect()  # чтобы фикстура корректно закрылась
+
+
+# --- Слепки расписания -------------------------------------------------
+
+WINDOW = (date(2026, 8, 31), date(2026, 9, 14))
+SLOTS = [
+    Slot(date="2026-08-31", interval="10:00–11:35", subject="Финансы", locations="ауд. 101"),
+    Slot(date="2026-09-01", interval="12:00–13:35", subject="MPS", subgroup="Shevchuk II"),
+]
+
+
+async def test_snapshot_round_trip(storage):
+    await storage.save_subscription(make())
+    await storage.save_snapshot(1, "key", WINDOW, SLOTS)
+
+    saved = await storage.get_snapshot(1)
+    assert saved.filter_key == "key"
+    assert saved.window == WINDOW
+    assert saved.slots == SLOTS
+
+
+async def test_snapshot_is_replaced_not_duplicated(storage):
+    await storage.save_subscription(make())
+    await storage.save_snapshot(1, "key", WINDOW, SLOTS)
+    await storage.save_snapshot(1, "other", WINDOW, SLOTS[:1])
+
+    saved = await storage.get_snapshot(1)
+    assert saved.filter_key == "other"
+    assert len(saved.slots) == 1
+
+
+async def test_missing_snapshot_is_none(storage):
+    assert await storage.get_snapshot(42) is None
+
+
+async def test_due_for_check_skips_those_who_said_no(storage):
+    moment = utcnow()
+    await storage.save_subscription(make(user_id=1))  # слежение включено, проверок не было
+    await storage.save_subscription(make(user_id=2, notify_changes=False))
+    await storage.save_subscription(
+        make(user_id=3, next_check_at=moment + timedelta(hours=1))
+    )
+    await storage.save_subscription(
+        make(user_id=4, next_check_at=moment - timedelta(minutes=1))
+    )
+
+    due = {item.user_id for item in await storage.due_for_check(moment)}
+    assert due == {1, 4}
+
+
+async def test_set_next_check_and_notify_flag(storage):
+    moment = utcnow() + timedelta(hours=3)
+    await storage.save_subscription(make())
+
+    await storage.set_next_check(1, moment)
+    assert (await storage.get_subscription(1)).next_check_at == moment
+
+    await storage.set_notify_changes(1, False)
+    assert (await storage.get_subscription(1)).notify_changes is False
+
+
+async def test_stop_forgets_the_snapshot(storage):
+    await storage.save_subscription(make())
+    await storage.save_snapshot(1, "key", WINDOW, SLOTS)
+
+    await storage.delete_subscription(1)
+    assert await storage.get_snapshot(1) is None
+
+
+async def test_snapshot_can_be_forgotten(storage):
+    await storage.save_subscription(make())
+    await storage.save_snapshot(1, "key", WINDOW, SLOTS)
+
+    await storage.clear_snapshot(1)
+    assert await storage.get_snapshot(1) is None

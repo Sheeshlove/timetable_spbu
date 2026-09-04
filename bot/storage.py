@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import aiosqlite
+
+from .changes import Slot
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -17,6 +20,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     language_course  TEXT NOT NULL DEFAULT '',
     language_teacher TEXT NOT NULL DEFAULT '',
     show_all     INTEGER NOT NULL DEFAULT 0,
+    notify_changes INTEGER NOT NULL DEFAULT 1,
+    next_check_at  TEXT,
     frequency    TEXT    NOT NULL DEFAULT 'off',
     send_hour    INTEGER NOT NULL DEFAULT 8,
     send_minute  INTEGER NOT NULL DEFAULT 0,
@@ -37,7 +42,17 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_due ON notes (status, due_at);
+CREATE TABLE IF NOT EXISTS schedule_snapshots (
+    user_id      INTEGER PRIMARY KEY,
+    filter_key   TEXT    NOT NULL DEFAULT '',
+    window_start TEXT    NOT NULL,
+    window_end   TEXT    NOT NULL,
+    slots        TEXT    NOT NULL,
+    updated_at   TEXT    NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_subscriptions_next_run ON subscriptions (next_run_at);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_next_check ON subscriptions (next_check_at);
 """
 
 # Колонки, добавленные после первой версии новой схемы: их дописываем
@@ -46,6 +61,8 @@ LATER_COLUMNS = {
     "lang": "lang TEXT NOT NULL DEFAULT 'ru'",
     "language_course": "language_course TEXT NOT NULL DEFAULT ''",
     "language_teacher": "language_teacher TEXT NOT NULL DEFAULT ''",
+    "notify_changes": "notify_changes INTEGER NOT NULL DEFAULT 1",
+    "next_check_at": "next_check_at TEXT",
 }
 
 
@@ -78,6 +95,9 @@ class Subscription:
     language_course: str = ""
     language_teacher: str = ""
     show_all: bool = False
+    # Уведомлять ли об изменениях в расписании и когда проверять в следующий раз
+    notify_changes: bool = True
+    next_check_at: datetime | None = None
     frequency: str = "off"
     send_hour: int = 8
     send_minute: int = 0
@@ -93,6 +113,8 @@ class Subscription:
             language_course=row["language_course"],
             language_teacher=row["language_teacher"],
             show_all=bool(row["show_all"]),
+            notify_changes=bool(row["notify_changes"]),
+            next_check_at=_parse(row["next_check_at"]),
             frequency=row["frequency"],
             send_hour=row["send_hour"],
             send_minute=row["send_minute"],
@@ -102,6 +124,21 @@ class Subscription:
     @property
     def send_time(self) -> str:
         return f"{self.send_hour:02d}:{self.send_minute:02d}"
+
+
+@dataclass
+class SnapshotRow:
+    """Сохранённый слепок расписания одного студента."""
+
+    user_id: int
+    filter_key: str
+    window_start: date
+    window_end: date
+    slots: list[Slot]
+
+    @property
+    def window(self) -> tuple[date, date]:
+        return (self.window_start, self.window_end)
 
 
 @dataclass
@@ -202,9 +239,9 @@ class Storage:
             """
             INSERT INTO subscriptions (
                 user_id, chat_id, student_name, lang, language_course, language_teacher,
-                show_all, frequency, send_hour, send_minute, next_run_at,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                show_all, notify_changes, next_check_at, frequency, send_hour,
+                send_minute, next_run_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 chat_id          = excluded.chat_id,
                 student_name     = excluded.student_name,
@@ -212,6 +249,8 @@ class Storage:
                 language_course  = excluded.language_course,
                 language_teacher = excluded.language_teacher,
                 show_all         = excluded.show_all,
+                notify_changes   = excluded.notify_changes,
+                next_check_at    = excluded.next_check_at,
                 frequency    = excluded.frequency,
                 send_hour    = excluded.send_hour,
                 send_minute  = excluded.send_minute,
@@ -226,6 +265,8 @@ class Storage:
                 subscription.language_course,
                 subscription.language_teacher,
                 int(subscription.show_all),
+                int(subscription.notify_changes),
+                _iso(subscription.next_check_at),
                 subscription.frequency,
                 subscription.send_hour,
                 subscription.send_minute,
@@ -257,6 +298,88 @@ class Storage:
 
     async def delete_subscription(self, user_id: int) -> None:
         await self.db.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
+        await self.db.execute("DELETE FROM schedule_snapshots WHERE user_id = ?", (user_id,))
+        await self.db.commit()
+
+    # --- Слежение за изменениями ---------------------------------------
+
+    async def due_for_check(self, moment: datetime) -> list[Subscription]:
+        """Кого пора проверить на изменения в расписании."""
+        async with self.db.execute(
+            """
+            SELECT * FROM subscriptions
+            WHERE notify_changes = 1
+              AND (next_check_at IS NULL OR next_check_at <= ?)
+            ORDER BY next_check_at IS NOT NULL, next_check_at
+            """,
+            (_iso(moment),),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        return [Subscription.from_row(row) for row in rows]
+
+    async def set_notify_changes(self, user_id: int, enabled: bool) -> None:
+        await self.db.execute(
+            "UPDATE subscriptions SET notify_changes = ?, updated_at = ? WHERE user_id = ?",
+            (int(enabled), _iso(utcnow()), user_id),
+        )
+        await self.db.commit()
+
+    async def set_next_check(self, user_id: int, moment: datetime | None) -> None:
+        await self.db.execute(
+            "UPDATE subscriptions SET next_check_at = ? WHERE user_id = ?",
+            (_iso(moment), user_id),
+        )
+        await self.db.commit()
+
+    async def get_snapshot(self, user_id: int) -> "SnapshotRow | None":
+        async with self.db.execute(
+            "SELECT * FROM schedule_snapshots WHERE user_id = ?", (user_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+        if row is None:
+            return None
+        return SnapshotRow(
+            user_id=row["user_id"],
+            filter_key=row["filter_key"],
+            window_start=date.fromisoformat(row["window_start"]),
+            window_end=date.fromisoformat(row["window_end"]),
+            slots=[Slot.from_dict(item) for item in json.loads(row["slots"])],
+        )
+
+    async def clear_snapshot(self, user_id: int) -> None:
+        await self.db.execute(
+            "DELETE FROM schedule_snapshots WHERE user_id = ?", (user_id,)
+        )
+        await self.db.commit()
+
+    async def save_snapshot(
+        self,
+        user_id: int,
+        filter_key: str,
+        window: tuple[date, date],
+        slots: list[Slot],
+    ) -> None:
+        await self.db.execute(
+            """
+            INSERT INTO schedule_snapshots (
+                user_id, filter_key, window_start, window_end, slots, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                filter_key   = excluded.filter_key,
+                window_start = excluded.window_start,
+                window_end   = excluded.window_end,
+                slots        = excluded.slots,
+                updated_at   = excluded.updated_at
+            """,
+            (
+                user_id,
+                filter_key,
+                window[0].isoformat(),
+                window[1].isoformat(),
+                json.dumps([slot.to_dict() for slot in slots], ensure_ascii=False),
+                _iso(utcnow()),
+            ),
+        )
         await self.db.commit()
 
     # --- Заметки -------------------------------------------------------

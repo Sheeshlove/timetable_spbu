@@ -6,8 +6,10 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from bot.config import Settings
+from bot.changes import Diff, Slot
 from bot.formatting import (
     digest_header,
+    format_changes,
     format_cohorts,
     format_notes,
     format_schedule,
@@ -176,3 +178,50 @@ def test_now_local_uses_given_timezone():
 
     assert now_local(TZ).tzinfo is TZ
     assert now_local(ZoneInfo("UTC")).utcoffset().total_seconds() == 0
+
+
+# --- Сообщение об изменениях -------------------------------------------
+
+
+def lesson(day: str, interval: str, subject: str, **extra) -> Slot:
+    return Slot(date=day, interval=interval, subject=subject, **extra)
+
+
+def test_changes_message_lists_every_kind():
+    diff = Diff(
+        added=[lesson("2026-09-01", "10:00–11:35", "Маркетинг", locations="ауд. 202")],
+        removed=[lesson("2026-09-02", "12:00–13:35", "Финансы")],
+        moved=[
+            (
+                lesson("2026-09-03", "10:00–11:35", "MPS", subgroup="Shevchuk II"),
+                lesson("2026-09-04", "14:00–15:35", "MPS", subgroup="Shevchuk II"),
+            )
+        ],
+        edited=[
+            (
+                lesson("2026-09-05", "10:00–11:35", "Статистика", locations="ауд. 101"),
+                lesson("2026-09-05", "10:00–11:35", "Статистика", locations="ауд. 303"),
+                ("locations",),
+            )
+        ],
+    )
+    text = format_changes(diff, RU)
+
+    assert "Расписание изменилось" in text
+    assert "Маркетинг" in text and "1 сентября" in text
+    assert "Финансы" in text
+    assert "Shevchuk II" in text and "было:" in text and "стало:" in text
+    assert "аудитория: ауд. 101 → ауд. 303" in text
+    assert "Настройки" in text  # подсказка, как выключить
+
+
+def test_changes_message_is_translated():
+    diff = Diff(added=[lesson("2026-09-01", "10:00–11:35", "Marketing")])
+    text = format_changes(diff, EN)
+    assert "The timetable has changed" in text
+    assert "Added" in text and "September 1" in text
+
+
+def test_changes_message_escapes_html():
+    diff = Diff(added=[lesson("2026-09-01", "10:00", "<b>Хак</b>")])
+    assert "&lt;b&gt;" in format_changes(diff, RU)

@@ -289,6 +289,29 @@ async def test_filter_can_be_switched_off_and_on(app):
     assert (await storage.get_subscription(777)).show_all is False
 
 
+async def test_change_watching_can_be_toggled(app):
+    telegram, storage, _ = app
+    await complete_setup(telegram)
+    assert (await storage.get_subscription(777)).notify_changes is True
+
+    await telegram.send("/settings")
+    assert "Слежу за изменениями расписания" in telegram.session.texts[-1]
+
+    await telegram.click_button("Не следить за изменениями")
+    saved = await storage.get_subscription(777)
+    assert saved.notify_changes is False
+    assert saved.student_name == "Shishlov Egor", "переключатель не должен терять студента"
+
+    await telegram.send("/settings")
+    await telegram.click_button("Следить за изменениями")
+    saved = await storage.get_subscription(777)
+    assert saved.notify_changes is True
+    # За время паузы расписание могло измениться само: старый слепок забыт,
+    # чтобы включение слежения не превратилось в разбор недельной давности.
+    assert await storage.get_snapshot(777) is None
+    assert saved.next_check_at is None
+
+
 async def test_surname_can_be_changed_from_settings(app):
     telegram, storage, _ = app
     await complete_setup(telegram)
