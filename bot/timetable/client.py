@@ -171,27 +171,55 @@ class TimetableClient:
     ) -> Schedule:
         """Расписание группы за период [start, end] включительно.
 
-        ``alias`` нужен только для резервного разбора HTML: адрес страницы
-        расписания содержит псевдоним подразделения. ``lang`` определяет, на
-        каком языке сайт отдаст названия занятий.
+        Основной источник — страницы расписания (HTML): только там есть
+        пометка подгруппы («Подгруппа 2», «Cohort 1») и перевод названий на
+        выбранный язык. JSON-API отдаёт те же занятия без подгруппы и всегда
+        по-русски, поэтому он остался запасным вариантом: расписание без
+        фильтра лучше, чем никакого.
+
+        ``alias`` — псевдоним подразделения в адресе страницы. ``lang``
+        определяет, на каком языке сайт отдаст названия занятий.
         """
         if end < start:
             start, end = end, start
+
+        empty: Schedule | None = None
+        html_error: TimetableError | None = None
         try:
-            payload = await self._fetch(
-                api.EVENTS_PATH.format(
-                    group_id=group_id, start=start.isoformat(), end=end.isoformat()
-                ),
-                as_json=True,
-                lang=lang,
-            )
-            schedule = api.parse_schedule(payload, group_id)
-            if schedule.days:
-                return _slice(schedule, start, end)
-            logger.warning("JSON-API вернул пустое расписание для группы %s", group_id)
+            schedule = await self._schedule_html(group_id, start, end, alias, lang)
         except TimetableError as error:
-            logger.warning("JSON-API расписания недоступен (%s), пробуем HTML", error)
-        return await self._schedule_html(group_id, start, end, alias, lang)
+            html_error = error
+            logger.warning("Страница расписания недоступна (%s), пробуем JSON-API", error)
+        else:
+            if schedule.days:
+                return schedule
+            # Пустая неделя бывает (каникулы), но бывает и сломанный разбор —
+            # сверимся с API, прежде чем говорить студенту «занятий нет».
+            empty = schedule
+            logger.info("Страница расписания пуста за %s — %s, сверяюсь с JSON-API", start, end)
+
+        try:
+            return await self._schedule_api(group_id, start, end, lang)
+        except TimetableError as error:
+            if empty is not None:
+                return empty
+            raise TimetableError(f"{html_error}; {error}") from error
+
+    async def _schedule_api(
+        self, group_id: int, start: date, end: date, lang: str = "ru"
+    ) -> Schedule:
+        """Запасной источник. Занятия те же, но без пометки подгруппы."""
+        payload = await self._fetch(
+            api.EVENTS_PATH.format(
+                group_id=group_id, start=start.isoformat(), end=end.isoformat()
+            ),
+            as_json=True,
+            lang=lang,
+        )
+        schedule = api.parse_schedule(payload, group_id)
+        if not schedule.days:
+            raise TimetableError(f"JSON-API вернул пустое расписание для группы {group_id}")
+        return _slice(schedule, start, end)
 
     async def _schedule_html(
         self, group_id: int, start: date, end: date, alias: str | None, lang: str = "ru"
